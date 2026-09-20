@@ -1,0 +1,264 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-900: #312e81;
+  
+  --color-secondary-50: #fdf2f8;
+  --color-secondary-100: #fce7f3;
+  --color-secondary-500: #ec4899;
+  --color-secondary-600: #db2777;
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+body {
+  background-color: var(--color-slate-50, #f8fafc);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.dark body {
+  background-color: var(--color-slate-950, #020617);
+}
+
+/* App Font Scaling */
+html[data-font-size="small"] {
+  font-size: 14px;
+}
+
+html[data-font-size="medium"] {
+  font-size: 16px;
+}
+
+html[data-font-size="large"] {
+  font-size: 18px;
+}
+
+.font-app-sans {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.font-app-serif {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+.font-app-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+/* ============================================================
+   THEME COLOR PALETTES (Whole page, containers, cards & accents)
+   ============================================================ */
+
+/* 1. Indigo (Default) */
+html[data-color-theme="indigo"],
+html:not([data-color-theme]) {
+  --theme-outer-bg: #f1f5f9;
+  --theme-page-bg: #f8fafc;
+  --theme-card-bg: #ffffff;
+  --theme-subtle-bg: #f1f5f9;
+  --theme-header-bg: #ffffff;
+  --theme-border: #e2e8f0;
+  --theme-accent: #6366f1;
+  --theme-accent-hover: #4f46e5;
+  --theme-accent-light: #eef2ff;
+  --theme-blob-1: rgba(236, 72, 153, 0.15);
+  --theme-blob-2: rgba(99, 102, 241, 0.15);
+}
+html.dark[data-color-theme="indigo"],
+.dark html[data-color-theme="indigo"],
+html.dark:not([data-color-theme]) {
+  --theme-outer-bg: #020617;
+  --theme-page-bg: #0b1120;
+  --theme-card-bg: #111c33;
+  --theme-subtle-bg: #1a2744;
+  --theme-header-bg: #0e172a;
+  --theme-border: #1e293b;
+  --theme-accent: #6366f1;
+  --theme-accent-hover: #818cf8;
+  --theme-accent-light: rgba(99, 102, 241, 0.15);
+  --theme-blob-1: rgba(236, 72, 153, 0.12);
+  --theme-blob-2: rgba(99, 102, 241, 0.15);
+}
+
+/* 2. Emerald (Zümrüt Doğa) */
+html[data-color-theme="emerald"] {
+  --theme-outer-bg: #e6f7ef;
+  --theme-page-bg: #f0fdf4;
+  --theme-card-bg: #ffffff;
+  --theme-subtle-bg: #dcfce7;
+  --theme-header-bg: #f0fdf4;
+  --theme-border: #bbf7d0;
+  --theme-accent: #059669;
+  --theme-accent-hover: #047857;
+  --theme-accent-light: #d1fae5;
+  --theme-blob-1: rgba(16, 185, 129, 0.22);
+  --theme-blob-2: rgba(20, 184, 166, 0.22);
+}
+html.dark[data-color-theme="emerald"],
+.dark html[data-color-theme="emerald"] {
+  --theme-outer-bg: #01120d;
+  --theme-page-bg: #031c15;
+  --theme-card-bg: #072a20;
+  --theme-subtle-bg: #0c382b;
+  --theme-header-bg: #05231a;
+  --theme-border: #0e4435;
+  --theme-accent: #10b981;
+  --theme-accent-hover: #34d399;
+  --theme-accent-light: rgba(16, 185, 129, 0.18);
+  --theme-blob-1: rgba(16, 185, 129, 0.18);
+  --theme-blob-2: rgba(5, 150, 105, 0.2);
+}
+
+/* 3. Sunset (Gün Batımı) */
+html[data-color-theme="sunset"] {
+  --theme-outer-bg: #ffe4e6;
+  --theme-page-bg: #fff1f2;
+  --theme-card-bg: #ffffff;
+  --theme-subtle-bg: #ffe4e6;
+  --theme-header-bg: #fff1f2;
+  --theme-border: #fecdd3;
+  --theme-accent: #f43f5e;
+  --theme-accent-hover: #e11d48;
+  --theme-accent-light: #ffe4e6;
+  --theme-blob-1: rgba(244, 63, 94, 0.22);
+  --theme-blob-2: rgba(251, 146, 60, 0.22);
+}
+html.dark[data-color-theme="sunset"],
+.dark html[data-color-theme="sunset"] {
+  --theme-outer-bg: #170409;
+  --theme-page-bg: #230810;
+  --theme-card-bg: #320d18;
+  --theme-subtle-bg: #431221;
+  --theme-header-bg: #290a13;
+  --theme-border: #4c1426;
+  --theme-accent: #fb7185;
+  --theme-accent-hover: #f43f5e;
+  --theme-accent-light: rgba(244, 63, 94, 0.2);
+  --theme-blob-1: rgba(244, 63, 94, 0.2);
+  --theme-blob-2: rgba(251, 113, 133, 0.18);
+}
+
+/* 4. Midnight (Gece Okyanusu) */
+html[data-color-theme="midnight"] {
+  --theme-outer-bg: #e0f2fe;
+  --theme-page-bg: #f0f9ff;
+  --theme-card-bg: #ffffff;
+  --theme-subtle-bg: #e0f2fe;
+  --theme-header-bg: #f0f9ff;
+  --theme-border: #bae6fd;
+  --theme-accent: #0284c7;
+  --theme-accent-hover: #0369a1;
+  --theme-accent-light: #e0f2fe;
+  --theme-blob-1: rgba(2, 132, 199, 0.22);
+  --theme-blob-2: rgba(56, 189, 248, 0.22);
+}
+html.dark[data-color-theme="midnight"],
+.dark html[data-color-theme="midnight"] {
+  --theme-outer-bg: #020b14;
+  --theme-page-bg: #041424;
+  --theme-card-bg: #081e35;
+  --theme-subtle-bg: #0e2b4b;
+  --theme-header-bg: #06192c;
+  --theme-border: #12355b;
+  --theme-accent: #38bdf8;
+  --theme-accent-hover: #0ea5e9;
+  --theme-accent-light: rgba(56, 189, 248, 0.18);
+  --theme-blob-1: rgba(14, 165, 233, 0.2);
+  --theme-blob-2: rgba(2, 132, 199, 0.22);
+}
+
+/* 5. Amethyst (Ametist Moru) */
+html[data-color-theme="amethyst"] {
+  --theme-outer-bg: #f3e8ff;
+  --theme-page-bg: #faf5ff;
+  --theme-card-bg: #ffffff;
+  --theme-subtle-bg: #f3e8ff;
+  --theme-header-bg: #faf5ff;
+  --theme-border: #e9d5ff;
+  --theme-accent: #9333ea;
+  --theme-accent-hover: #7e22ce;
+  --theme-accent-light: #f3e8ff;
+  --theme-blob-1: rgba(147, 51, 234, 0.22);
+  --theme-blob-2: rgba(192, 132, 252, 0.22);
+}
+html.dark[data-color-theme="amethyst"],
+.dark html[data-color-theme="amethyst"] {
+  --theme-outer-bg: #0f041c;
+  --theme-page-bg: #18082c;
+  --theme-card-bg: #230d3e;
+  --theme-subtle-bg: #2f1352;
+  --theme-header-bg: #1c0a34;
+  --theme-border: #3c1968;
+  --theme-accent: #c084fc;
+  --theme-accent-hover: #a855f7;
+  --theme-accent-light: rgba(192, 132, 252, 0.2);
+  --theme-blob-1: rgba(168, 85, 247, 0.2);
+  --theme-blob-2: rgba(147, 51, 234, 0.22);
+}
+
+/* 6. Amber (Kehribar & Bal) */
+html[data-color-theme="amber"] {
+  --theme-outer-bg: #fef3c7;
+  --theme-page-bg: #fffbeb;
+  --theme-card-bg: #ffffff;
+  --theme-subtle-bg: #fef3c7;
+  --theme-header-bg: #fffbeb;
+  --theme-border: #fde68a;
+  --theme-accent: #d97706;
+  --theme-accent-hover: #b45309;
+  --theme-accent-light: #fef3c7;
+  --theme-blob-1: rgba(217, 119, 6, 0.22);
+  --theme-blob-2: rgba(245, 158, 11, 0.22);
+}
+html.dark[data-color-theme="amber"],
+.dark html[data-color-theme="amber"] {
+  --theme-outer-bg: #140d02;
+  --theme-page-bg: #1f1404;
+  --theme-card-bg: #2c1d07;
+  --theme-subtle-bg: #3a270b;
+  --theme-header-bg: #241705;
+  --theme-border: #463010;
+  --theme-accent: #fbbf24;
+  --theme-accent-hover: #f59e0b;
+  --theme-accent-light: rgba(251, 191, 36, 0.2);
+  --theme-blob-1: rgba(245, 158, 11, 0.2);
+  --theme-blob-2: rgba(217, 119, 6, 0.22);
+}
+
+/* Base Theme Surfaces */
+.app-outer-bg {
+  background-color: var(--theme-outer-bg, #f1f5f9);
+  transition: background-color 0.35s ease;
+}
+
+.app-page-bg {
+  background-color: var(--theme-page-bg, #ffffff);
+  transition: background-color 0.35s ease;
+}
+
+.app-card-bg {
+  background-color: var(--theme-card-bg, #ffffff);
+  border-color: var(--theme-border, #e2e8f0);
+  transition: background-color 0.35s ease, border-color 0.35s ease;
+}
+
+.app-header-bg {
+  background-color: var(--theme-header-bg, #ffffff);
+  border-color: var(--theme-border, #e2e8f0);
+  transition: background-color 0.35s ease, border-color 0.35s ease;
+}
+
+

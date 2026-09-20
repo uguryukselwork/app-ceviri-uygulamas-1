@@ -1,0 +1,8 @@
+{
+  "name": "Çeviri app 1",
+  "description": "A real-time translation messaging app for couples and friends speaking different languages.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
