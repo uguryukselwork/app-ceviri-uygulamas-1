@@ -16,6 +16,9 @@ export const LANGUAGES = [
   { code: 'tk', name: 'Türkmence 🇹🇲' }
 ];
 
+// Language names carry flag emoji, which Windows renders as bare letters ("TR").
+export const plainLanguageName = (name: string) => name.replace(/[\u{1F1E6}-\u{1F1FF}]/gu, '').trim();
+
 export const getBrowserLanguage = () => {
   const lang = navigator.language.split('-')[0];
   return LANGUAGES.find(l => l.code === lang) ? lang : 'en';
@@ -31,6 +34,10 @@ const translations: Record<string, Record<string, string>> = {
     'home.create_desc': 'Yeni bir sohbet başlat ve davet et',
     'home.join_room': 'Odaya Gir',
     'home.join_desc': 'Davet kodunu kullanarak sohbete katıl',
+    'home.name_placeholder': 'Adını yaz',
+    'home.name_hint': 'Başlamak için adını yaz.',
+    'home.recent': 'Son sohbetler',
+    'home.change_photo': 'Fotoğrafı değiştir',
     
     'profile.title': 'Profilini Oluştur',
     'profile.subtitle': 'Seni nasıl çağıralım?',
@@ -59,6 +66,13 @@ const translations: Record<string, Record<string, string>> = {
     'join.joining': 'Katılınıyor...',
 
     'room.waiting': 'Arkadaşınızın odaya katılması bekleniyor...',
+    'room.waiting_title': 'Arkadaşın henüz gelmedi',
+    'room.waiting_desc': 'Bu kodu ona gönder. Katıldığında her mesaj ikinizin diline çevrilir.',
+    'room.unnamed': 'İsimsiz sohbet',
+    'room.not_found': 'Bu kodla bir oda yok',
+    'room.not_found_hint': 'Kodu kontrol et ya da arkadaşından yeni bir davet iste.',
+    'room.load_error': 'Oda açılamadı',
+    'room.back_home': 'Ana sayfaya dön',
     'room.your_code': 'Oda Kodunuz:',
     'room.type_message': 'Bir mesaj yazın...',
     'room.settings': 'Ayarlar',
@@ -96,6 +110,10 @@ const translations: Record<string, Record<string, string>> = {
     'home.create_desc': 'Start a new chat and invite',
     'home.join_room': 'Join Room',
     'home.join_desc': 'Join a chat using invite code',
+    'home.name_placeholder': 'Your name',
+    'home.name_hint': 'Type your name to get started.',
+    'home.recent': 'Recent chats',
+    'home.change_photo': 'Change photo',
     
     'profile.title': 'Create Profile',
     'profile.subtitle': 'How should we call you?',
@@ -124,6 +142,13 @@ const translations: Record<string, Record<string, string>> = {
     'join.joining': 'Joining...',
 
     'room.waiting': 'Waiting for your friend to join...',
+    'room.waiting_title': "Your friend hasn't joined yet",
+    'room.waiting_desc': 'Send them this code. Once they join, every message is translated into each of your languages.',
+    'room.unnamed': 'Untitled chat',
+    'room.not_found': 'No room with this code',
+    'room.not_found_hint': 'Check the code or ask your friend for a new invite.',
+    'room.load_error': "Couldn't open the room",
+    'room.back_home': 'Back to home',
     'room.your_code': 'Your Room Code:',
     'room.type_message': 'Type a message...',
     'room.settings': 'Settings',

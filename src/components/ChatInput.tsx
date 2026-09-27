@@ -81,19 +81,21 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   return (
     <form 
       onSubmit={handleSubmit}
-      className="p-3.5 sm:p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex items-end gap-2 shrink-0 pb-safe z-20 shadow-sm transition-colors"
+      className="px-3 pt-2 pb-3 app-page-bg flex items-end gap-2 shrink-0 pb-safe z-20 transition-colors"
     >
-      <div className="flex-1 relative bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 focus-within:border-indigo-300 dark:focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-500/20 transition-all flex items-end">
-        <div className="relative shrink-0 flex items-center justify-center p-2 pl-3" ref={popoverRef}>
+      <div className="flex-1 relative bg-(--theme-card-bg) rounded-[1.6rem] border-2 border-(--theme-border) focus-within:border-(--theme-accent) transition-colors flex items-end">
+        <div className="relative shrink-0 flex items-center justify-center p-1.5 pl-2" ref={popoverRef}>
           <button
             type="button"
             title="Hazır Mesajlar"
+            aria-label="Hazır mesajlar"
+            aria-expanded={showQuickMessages}
             onClick={() => setShowQuickMessages(!showQuickMessages)}
             className={cn(
-              "p-1.5 rounded-lg transition-colors",
+              "w-9 h-9 rounded-full flex items-center justify-center transition-colors",
               showQuickMessages 
-                ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400" 
-                : "text-slate-400 hover:text-indigo-600 hover:bg-slate-200 dark:hover:bg-slate-700"
+                ? "bg-(--theme-accent-light) text-(--theme-accent)" 
+                : "text-(--theme-muted) hover:text-(--theme-accent) hover:bg-(--theme-accent-light)"
             )}
           >
             <Zap className="w-5 h-5" />
@@ -101,10 +103,10 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           
           {/* Quick Messages Popover */}
           {showQuickMessages && (
-            <div className="absolute bottom-full left-0 mb-3 w-72 sm:w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden z-50">
-              <div className="p-3 border-b border-slate-100 dark:border-slate-700 font-medium text-sm text-slate-700 dark:text-slate-300 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/80">
-                <span className="flex items-center gap-1.5 font-semibold text-xs tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                  <Zap className="w-3.5 h-3.5 text-indigo-500" />
+            <div className="absolute bottom-full left-0 mb-3 w-72 sm:w-80 bg-(--theme-card-bg) rounded-3xl shadow-xl border border-(--theme-border) overflow-hidden z-50">
+              <div className="pl-4 pr-2 py-2 border-b border-(--theme-border) flex justify-between items-center">
+                <span className="flex items-center gap-1.5 font-bold text-sm text-(--theme-ink)">
+                  <Zap className="w-4 h-4 text-(--theme-accent)" />
                   Hazır Mesajlar
                 </span>
                 <button 
@@ -113,26 +115,27 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                     setShowQuickMessages(false);
                     setEditingMsg(null);
                   }} 
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  aria-label="Kapat"
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-(--theme-muted) hover:text-(--theme-ink) hover:bg-(--theme-subtle-bg) transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="max-h-52 overflow-y-auto p-2 space-y-1.5 divide-y divide-slate-100 dark:divide-slate-700/50">
+              <div className="max-h-56 overflow-y-auto p-2 space-y-0.5">
                 {quickMessages.length === 0 ? (
-                  <p className="text-xs text-center text-slate-400 py-4">Kayıtlı hazır mesaj yok.</p>
+                  <p className="text-sm text-center text-(--theme-muted) py-4 px-3">Henüz hazır mesaj yok. Sık yazdıklarını aşağıya ekle.</p>
                 ) : (
                   quickMessages.map((msg, index) => (
-                    <div key={`${msg}-${index}`} className="pt-1.5 first:pt-0">
+                    <div key={`${msg}-${index}`}>
                       {editingMsg === msg ? (
-                        <div className="p-1.5 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800/60">
+                        <div className="p-1 bg-(--theme-accent-light) rounded-2xl flex items-center gap-1">
                           <input
                             type="text"
                             value={editText}
                             onChange={(e) => setEditText(e.target.value)}
                             autoFocus
                             placeholder="Mesajı düzenle..."
-                            className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-100"
+                            className="flex-1 min-w-0 bg-(--theme-card-bg) border-2 border-transparent rounded-xl px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-(--theme-accent) text-(--theme-ink)"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -146,7 +149,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                             type="button"
                             title="Kaydet"
                             onClick={handleSaveEdit}
-                            className="p-1.5 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 rounded-lg transition-colors cursor-pointer"
+                            aria-label="Kaydet"
+                            className="w-8 h-8 flex items-center justify-center text-(--theme-accent) hover:bg-(--theme-card-bg) rounded-full transition-colors cursor-pointer"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
@@ -154,20 +158,21 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                             type="button"
                             title="İptal"
                             onClick={handleCancelEdit}
-                            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                            aria-label="İptal"
+                            className="w-8 h-8 flex items-center justify-center text-(--theme-muted) hover:text-(--theme-ink) hover:bg-(--theme-card-bg) rounded-full transition-colors cursor-pointer"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between gap-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors p-1 group">
+                        <div className="flex items-center justify-between gap-1 rounded-2xl hover:bg-(--theme-subtle-bg) transition-colors p-0.5 group">
                           <button 
                             type="button"
                             onClick={() => {
                               setShowQuickMessages(false);
                               onSend(msg);
                             }}
-                            className="flex-1 min-w-0 text-left px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 truncate hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                            className="flex-1 min-w-0 text-left px-2 py-1.5 text-sm font-semibold text-(--theme-ink) truncate hover:text-(--theme-accent) transition-colors cursor-pointer"
                             title={msg}
                           >
                             {msg}
@@ -180,7 +185,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                                 e.stopPropagation();
                                 startEditing(msg);
                               }}
-                              className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-colors cursor-pointer active:scale-95"
+                              aria-label="Düzenle"
+                              className="w-8 h-8 flex items-center justify-center text-(--theme-muted) hover:text-(--theme-accent) hover:bg-(--theme-accent-light) rounded-full transition-colors cursor-pointer"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
@@ -191,7 +197,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                                 e.stopPropagation();
                                 removeQuickMessage(msg);
                               }}
-                              className="p-1.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer active:scale-95"
+                              aria-label="Sil"
+                              className="w-8 h-8 flex items-center justify-center text-(--theme-muted) hover:text-red-600 hover:bg-red-500/10 rounded-full transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -202,13 +209,14 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                   ))
                 )}
               </div>
-              <div className="p-2.5 border-t border-slate-100 dark:border-slate-700 flex gap-2 bg-slate-50/30 dark:bg-slate-800/40">
+              <div className="p-2 border-t border-(--theme-border) flex items-center gap-2">
                 <input 
                   type="text" 
                   value={newQuickMsg}
                   onChange={(e) => setNewQuickMsg(e.target.value)}
-                  placeholder="Yeni hazır mesaj ekle..."
-                  className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200 placeholder:text-slate-400"
+                  placeholder="Yeni hazır mesaj"
+                  aria-label="Yeni hazır mesaj"
+                  className="flex-1 min-w-0 bg-(--theme-subtle-bg) border-2 border-transparent rounded-full px-3.5 py-1.5 text-sm font-semibold outline-none focus:border-(--theme-accent) text-(--theme-ink) placeholder:text-(--theme-muted)"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -229,7 +237,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                     }
                   }}
                   disabled={!newQuickMsg.trim()}
-                  className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer shadow-xs"
+                  className="w-8 h-8 bg-(--theme-accent) hover:bg-(--theme-accent-hover) text-(--theme-on-accent) rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -246,21 +254,22 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           placeholder={t('room.type_message', profile.language)}
           disabled={disabled}
           rows={1}
-          className="w-full max-h-32 bg-transparent border-none focus:ring-0 resize-none py-3 pr-4 text-[16px] sm:text-[15px] text-slate-800 dark:text-slate-200 disabled:opacity-50"
+          className="w-full max-h-32 bg-transparent border-none outline-none focus:ring-0 resize-none py-3 pr-4 text-[16px] sm:text-[15px] text-(--theme-ink) placeholder:text-(--theme-muted) disabled:opacity-50"
         />
       </div>
       
       <button
         type="submit"
         disabled={!text.trim() || disabled}
+        aria-label="Gönder"
         className={cn(
-          "p-3 rounded-xl flex items-center justify-center transition-all shrink-0",
+          "w-[52px] h-[52px] rounded-full flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--theme-accent)",
           text.trim() && !disabled
-            ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-600/20"
-            : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+            ? "bg-(--theme-accent) text-(--theme-on-accent) hover:bg-(--theme-accent-hover) active:scale-95"
+            : "bg-(--theme-subtle-bg) text-(--theme-muted)"
         )}
       >
-        <Send className="w-6 h-6" />
+        <Send className="w-5 h-5 -ml-0.5" />
       </button>
     </form>
   );

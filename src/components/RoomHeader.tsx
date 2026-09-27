@@ -82,82 +82,66 @@ export default function RoomHeader({ roomCode, partnerName, partnerGender, partn
   const currentRoom = savedRooms.find(r => r.code === roomCode);
   const displayName = currentRoom?.customName || partnerName;
 
+  const statusDot = !isConnected ? 'bg-red-500' : partnerStatus === 'busy' ? 'bg-red-500' : partnerStatus === 'away' ? 'bg-amber-400' : 'bg-emerald-500';
+  const statusText = !isConnected
+    ? t('room.no_connection', profile.language)
+    : partnerStatus === 'busy' ? 'Rahatsız Etmeyin'
+    : partnerStatus === 'away' ? 'Dışarıda'
+    : t('room.online', profile.language);
+  const hasPartner = !!(partnerName || currentRoom?.customName);
+  const iconButton = 'w-10 h-10 rounded-full flex items-center justify-center text-(--theme-muted) hover:text-(--theme-ink) hover:bg-(--theme-subtle-bg) transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--theme-accent)';
+
   return (
     <header className="sticky top-0 z-20 shrink-0 select-none">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 dark:bg-slate-800 text-white text-xs font-medium px-3.5 py-2 rounded-full shadow-lg flex items-center gap-1.5 border border-slate-700 animate-in fade-in">
-          <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
+        <div role="status" className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-(--theme-ink) text-(--theme-page-bg) text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Main Top Navigation Bar */}
-      <div className="app-header-bg backdrop-blur-md border-b p-3.5 sm:p-4 flex items-center justify-between shadow-xs transition-colors relative z-20">
+      <div className="app-header-bg border-b px-2 py-2.5 flex items-center justify-between gap-1 transition-colors relative z-20">
         {/* Left side: Back button & Partner Info */}
-        <div className="flex flex-1 items-center gap-2 sm:gap-3 min-w-0">
-          <button 
-            onClick={() => navigate('/')}
-            className="p-2 -ml-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors shrink-0"
-          >
-            <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+        <div className="flex flex-1 items-center gap-1.5 min-w-0">
+          <button onClick={() => navigate('/')} className={iconButton} aria-label="Ana sayfa">
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            {partnerName || currentRoom?.customName ? (
-              <>
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-pink-50 dark:bg-pink-950/40 rounded-full flex items-center justify-center text-lg sm:text-xl shrink-0 overflow-hidden">
-                  {partnerAvatar ? (
-                    <img src={partnerAvatar} alt={displayName} className="w-full h-full object-cover" />
+
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-10 h-10 rounded-full p-0.5 bg-(--theme-accent-light)">
+                <div className="w-full h-full rounded-full overflow-hidden bg-(--theme-card-bg) text-(--theme-accent) flex items-center justify-center font-display font-semibold">
+                  {hasPartner && partnerAvatar ? (
+                    <img src={partnerAvatar} alt="" className="w-full h-full object-cover" />
+                  ) : hasPartner ? (
+                    (displayName || '?')[0].toLocaleUpperCase(profile.language)
                   ) : (
-                    partnerGender === 'female' ? '👩' : (partnerGender === 'male' ? '👨' : '👥')
+                    <Users className="w-4 h-4" />
                   )}
                 </div>
-                <div className="min-w-0">
-                  <h2 className="font-semibold text-sm sm:text-base text-slate-800 dark:text-slate-100 truncate">{displayName}</h2>
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${!isConnected ? 'bg-red-500' : partnerStatus === 'busy' ? 'bg-red-500' : partnerStatus === 'away' ? 'bg-yellow-500' : 'bg-green-500'}`} />
-                    <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
-                      {!isConnected 
-                        ? t('room.no_connection', profile.language) 
-                        : partnerStatus === 'busy' ? 'Rahatsız Etmeyin'
-                        : partnerStatus === 'away' ? 'Dışarıda'
-                        : t('room.online', profile.language)}
-                      {participantsCount > 0 && (
-                        <span className="ml-1.5 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-[10px] border border-slate-200 dark:border-slate-700">
-                          {participantsCount}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="min-w-0">
-                <h2 className="font-semibold text-sm sm:text-base text-slate-800 dark:text-slate-100 truncate">{t('room.waiting_partner', profile.language)}</h2>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                  <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
-                    {t('room.connecting', profile.language)}
-                    {participantsCount > 0 && (
-                      <span className="ml-1.5 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-[10px] border border-slate-200 dark:border-slate-700">
-                        {participantsCount}
-                      </span>
-                    )}
-                  </span>
-                </div>
               </div>
-            )}
+              <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-(--theme-header-bg) ${hasPartner ? statusDot : 'bg-amber-400 animate-pulse'}`} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-display font-semibold text-[17px] leading-tight text-(--theme-ink) truncate">
+                {hasPartner ? displayName : t('room.waiting_partner', profile.language)}
+              </h2>
+              <p className="text-xs font-semibold text-(--theme-muted) truncate">
+                {hasPartner ? statusText : t('room.connecting', profile.language)}
+                {participantsCount > 2 && `, ${participantsCount} kişi`}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Right side: Share Button, Friends, Settings */}
-        <div className="flex items-center gap-1.5 sm:gap-2 relative shrink-0">
-          {/* Incognito Active Indicator */}
+        {/* Right side: Incognito, Rooms, Share, Settings */}
+        <div className="flex items-center shrink-0">
           {hideProfile && (
             <button
               onClick={onOpenSettings}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 text-xs font-semibold"
+              className="flex items-center gap-1 px-2.5 py-1.5 mr-1 rounded-full bg-(--theme-accent-light) text-(--theme-accent) text-xs font-bold"
               title="Gizli Profil Aktif (Değiştirmek için tıkla)"
             >
               <EyeOff className="w-3.5 h-3.5" />
@@ -165,57 +149,50 @@ export default function RoomHeader({ roomCode, partnerName, partnerGender, partn
             </button>
           )}
 
-          {/* Friends Button */}
           {onOpenParticipants && (
-            <button 
-              onClick={onOpenParticipants}
-              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-              title="Arkadaşlar"
-            >
-              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+            <button onClick={onOpenParticipants} className={iconButton} aria-label="Odalarım" title="Odalarım">
+              <Users className="w-5 h-5" />
             </button>
           )}
 
-          {/* Share Button */}
-          <button 
+          <button
             onClick={handleWhatsAppShare}
-            className="p-2 rounded-xl transition-all cursor-pointer active:scale-95 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400"
+            className={iconButton}
+            aria-label={t('room.share', profile.language)}
             title={t('room.share', profile.language)}
           >
-            <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
+            <Share2 className="w-5 h-5" />
           </button>
-          
-          {/* Settings Button */}
-          <button 
+
+          <button
             onClick={onOpenSettings}
-            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+            className={iconButton}
+            aria-label={t('room.settings', profile.language)}
             title={t('room.settings', profile.language)}
           >
-            <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
+            <Settings className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Pinned Room Code Button Area - Pinned right below top bar matching the user's drawing */}
-      <div className="flex items-center justify-center pt-2.5 pb-1 px-4 pointer-events-none relative z-10">
-        <button 
+      {/* Room code pill, pinned under the top bar */}
+      <div className="flex items-center justify-center pt-2 pb-1 px-4 pointer-events-none relative z-10">
+        <button
           onClick={copyCode}
-          className="pointer-events-auto flex items-center gap-2 px-4 py-1.5 bg-white/95 dark:bg-slate-850/95 backdrop-blur-md hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-mono font-semibold shadow-xs border border-slate-200/90 dark:border-slate-750 transition-all active:scale-95 group cursor-pointer"
+          className="pointer-events-auto flex items-center gap-2 pl-3 pr-3.5 py-1.5 rounded-full bg-(--theme-card-bg) border border-(--theme-border) text-xs transition-transform active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--theme-accent)"
           title={t('room.copy', profile.language)}
         >
           {copiedCode ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-(--theme-accent) shrink-0" />
           ) : (
-            <Copy className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0 group-hover:scale-110 transition-transform" />
+            <Copy className="w-3.5 h-3.5 text-(--theme-accent) shrink-0" />
           )}
-          <span className="tracking-wider font-bold text-slate-900 dark:text-slate-100">{roomCode}</span>
-          <span className="text-[11px] font-sans font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-750 pl-2">
-            {copiedCode ? 'Kopyalandı' : 'Kodu Kopyala'}
+          <span className="font-display font-semibold text-sm tracking-[0.1em] text-(--theme-ink)">{roomCode}</span>
+          <span className="font-semibold text-(--theme-muted)">
+            {copiedCode ? 'Kopyalandı' : 'Kodu kopyala'}
           </span>
         </button>
       </div>
-
-      {/* Share Modal Dialog Removed */}
     </header>
   );
 }

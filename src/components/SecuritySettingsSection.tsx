@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Unlock, Fingerprint, KeyRound, Check, RefreshCw } from 'lucide-react';
+import { Lock, Unlock, Fingerprint, DoorClosed, KeyRound, Check } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import SecurityLockModal from './SecurityLockModal';
+import { SettingsGroup, SettingsRow, Toggle } from './ui';
 
 export default function SecuritySettingsSection() {
   const {
@@ -17,17 +18,11 @@ export default function SecuritySettingsSection() {
   } = useStore();
 
   const [showSetupModal, setShowSetupModal] = useState(false);
-  const [setupMode, setSetupMode] = useState<'setup' | 'unlock'>('setup');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
-  };
-
-  const handleCreatePin = () => {
-    setSetupMode('setup');
-    setShowSetupModal(true);
   };
 
   const handleRemovePin = () => {
@@ -36,233 +31,78 @@ export default function SecuritySettingsSection() {
       setIsAppLockEnabled(false);
       setIsRoomLockEnabled(false);
       setBiometricEnabled(false);
-      showToast('PIN kodu ve güvenlik kilitleri kaldırıldı');
+      showToast('PIN ve tüm kilitler kaldırıldı.');
     }
   };
 
+  const pillButton = 'px-3 py-1.5 rounded-full text-[13px] font-bold shrink-0 cursor-pointer transition-colors';
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-2">
-          <Shield className="w-4 h-4 text-emerald-500" /> Güvenlik & Kilit
-        </h3>
-        {appPin && (
-          <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-            <Check className="w-3 h-3" /> PIN Aktif
-          </span>
-        )}
-      </div>
-
-      {toastMessage && (
-        <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-          <Check className="w-3.5 h-3.5 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {/* PIN Card */}
-      <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-2xl border border-slate-200/80 dark:border-slate-750">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2.5">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-              appPin 
-                ? 'bg-emerald-500 text-white shadow-xs' 
-                : 'bg-slate-200 dark:bg-slate-750 text-slate-600 dark:text-slate-300'
-            }`}>
-              {appPin ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                {appPin ? '4 Haneli Güvenlik PIN Kodu' : 'PIN Kodu Belirlenmedi'}
-              </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {appPin ? 'PIN kodunuz ayarlandı ve aktif' : 'Sohbet ve odalarınızı kilitlemek için PIN oluşturun'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-750/80">
-          {!appPin ? (
+    <div className="space-y-2">
+      <SettingsGroup title="Güvenlik">
+        <SettingsRow
+          icon={appPin ? <Lock className="w-[18px] h-[18px]" /> : <Unlock className="w-[18px] h-[18px]" />}
+          title="PIN kodu"
+          description={appPin ? '4 haneli PIN ayarlı.' : 'Uygulamayı ve odaları kilitlemek için bir PIN oluştur.'}
+          trailing={
             <button
               type="button"
-              onClick={handleCreatePin}
-              className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              onClick={() => setShowSetupModal(true)}
+              className={appPin
+                ? `${pillButton} bg-(--theme-subtle-bg) text-(--theme-ink) hover:text-(--theme-accent)`
+                : `${pillButton} bg-(--theme-accent) text-(--theme-on-accent) hover:bg-(--theme-accent-hover)`}
             >
-              <KeyRound className="w-3.5 h-3.5" /> PIN Kodu Oluştur
+              {appPin ? 'Değiştir' : 'Oluştur'}
             </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleCreatePin}
-                className="flex-1 py-1.5 px-3 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> PIN Değiştir
+          }
+        />
+        <SettingsRow
+          icon={<KeyRound className="w-[18px] h-[18px]" />}
+          title="Açılışta kilitle"
+          description="Uygulama açılırken PIN sorulur."
+          disabled={!appPin}
+          trailing={<Toggle label="Açılışta kilitle" disabled={!appPin} checked={isAppLockEnabled && !!appPin} onChange={setIsAppLockEnabled} />}
+        />
+        <SettingsRow
+          icon={<DoorClosed className="w-[18px] h-[18px]" />}
+          title="Odalara girişte kilitle"
+          description="Her odaya girerken PIN sorulur."
+          disabled={!appPin}
+          trailing={<Toggle label="Odalara girişte kilitle" disabled={!appPin} checked={isRoomLockEnabled && !!appPin} onChange={setIsRoomLockEnabled} />}
+        />
+        <SettingsRow
+          icon={<Fingerprint className="w-[18px] h-[18px]" />}
+          title="Parmak izi veya yüz tanıma"
+          description="PIN yerine tek dokunuşla aç."
+          disabled={!appPin}
+          trailing={<Toggle label="Parmak izi veya yüz tanıma" disabled={!appPin} checked={biometricEnabled && !!appPin} onChange={setBiometricEnabled} />}
+        />
+        {appPin && (
+          <div className="flex items-center justify-between gap-2 px-4 py-3">
+            {isAppLockEnabled ? (
+              <button type="button" onClick={() => lockAppNow()} className={`${pillButton} -ml-3 text-(--theme-accent) hover:bg-(--theme-accent-light)`}>
+                Şimdi kilitle
               </button>
-              <button
-                type="button"
-                onClick={handleRemovePin}
-                className="py-1.5 px-3 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl text-xs font-medium transition-colors cursor-pointer"
-              >
-                Kaldır
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+            ) : <span />}
+            <button type="button" onClick={handleRemovePin} className={`${pillButton} -mr-3 text-red-600 dark:text-red-400 hover:bg-red-500/10`}>
+              PIN'i kaldır
+            </button>
+          </div>
+        )}
+      </SettingsGroup>
 
-      {/* Security Options (Toggles) */}
-      <div className="space-y-2">
-        {/* Toggle 1: Lock on App Start */}
-        <label 
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-            !appPin 
-              ? 'opacity-60 bg-slate-50/50 dark:bg-slate-850/50 border-slate-100 dark:border-slate-800 cursor-not-allowed'
-              : 'bg-slate-50 dark:bg-slate-850 border-slate-100 dark:border-slate-750 cursor-pointer'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <Lock className="w-4 h-4 text-indigo-500 shrink-0" />
-            <div>
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 block">
-                Uygulama Başlangıcında Kilitle
-              </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                Uygulama açılırken PIN kodu veya biyometrik kilit sorulur
-              </span>
-            </div>
-          </div>
-          <div 
-            className="relative inline-block w-10 h-5 rounded-full bg-slate-200 dark:bg-slate-600 transition-colors shrink-0"
-            style={{ backgroundColor: isAppLockEnabled && appPin ? '#6366f1' : undefined }}
-          >
-            <input 
-              type="checkbox" 
-              className="opacity-0 w-0 h-0"
-              disabled={!appPin}
-              checked={isAppLockEnabled && !!appPin}
-              onChange={(e) => {
-                if (!appPin) {
-                  handleCreatePin();
-                } else {
-                  setIsAppLockEnabled(e.target.checked);
-                }
-              }}
-            />
-            <span 
-              className="absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform shadow-xs"
-              style={{ transform: isAppLockEnabled && appPin ? 'translateX(20px)' : 'translateX(0)' }}
-            />
-          </div>
-        </label>
-
-        {/* Toggle 2: Lock on Room Entry */}
-        <label 
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-            !appPin 
-              ? 'opacity-60 bg-slate-50/50 dark:bg-slate-850/50 border-slate-100 dark:border-slate-800 cursor-not-allowed'
-              : 'bg-slate-50 dark:bg-slate-850 border-slate-100 dark:border-slate-750 cursor-pointer'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
-            <div>
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 block">
-                Odalara Girişte Kilitle
-              </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                Sohbet odalarına girerken güvenlik doğrulaması ister
-              </span>
-            </div>
-          </div>
-          <div 
-            className="relative inline-block w-10 h-5 rounded-full bg-slate-200 dark:bg-slate-600 transition-colors shrink-0"
-            style={{ backgroundColor: isRoomLockEnabled && appPin ? '#10b981' : undefined }}
-          >
-            <input 
-              type="checkbox" 
-              className="opacity-0 w-0 h-0"
-              disabled={!appPin}
-              checked={isRoomLockEnabled && !!appPin}
-              onChange={(e) => {
-                if (!appPin) {
-                  handleCreatePin();
-                } else {
-                  setIsRoomLockEnabled(e.target.checked);
-                }
-              }}
-            />
-            <span 
-              className="absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform shadow-xs"
-              style={{ transform: isRoomLockEnabled && appPin ? 'translateX(20px)' : 'translateX(0)' }}
-            />
-          </div>
-        </label>
-
-        {/* Toggle 3: Biometric Lock */}
-        <label 
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-            !appPin 
-              ? 'opacity-60 bg-slate-50/50 dark:bg-slate-850/50 border-slate-100 dark:border-slate-800 cursor-not-allowed'
-              : 'bg-slate-50 dark:bg-slate-850 border-slate-100 dark:border-slate-750 cursor-pointer'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <Fingerprint className="w-4 h-4 text-purple-500 shrink-0" />
-            <div>
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 block">
-                Biyometrik Kilit (Face ID / Touch ID)
-              </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                Cihaz parmak izi veya yüz tanıma ile tek dokunuşta açın
-              </span>
-            </div>
-          </div>
-          <div 
-            className="relative inline-block w-10 h-5 rounded-full bg-slate-200 dark:bg-slate-600 transition-colors shrink-0"
-            style={{ backgroundColor: biometricEnabled && appPin ? '#8b5cf6' : undefined }}
-          >
-            <input 
-              type="checkbox" 
-              className="opacity-0 w-0 h-0"
-              disabled={!appPin}
-              checked={biometricEnabled && !!appPin}
-              onChange={(e) => {
-                if (!appPin) {
-                  handleCreatePin();
-                } else {
-                  setBiometricEnabled(e.target.checked);
-                }
-              }}
-            />
-            <span 
-              className="absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform shadow-xs"
-              style={{ transform: biometricEnabled && appPin ? 'translateX(20px)' : 'translateX(0)' }}
-            />
-          </div>
-        </label>
-      </div>
-
-      {/* Lock App Now Test Button */}
-      {appPin && isAppLockEnabled && (
-        <button
-          type="button"
-          onClick={() => lockAppNow()}
-          className="w-full py-2 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
-        >
-          <Lock className="w-3.5 h-3.5 text-indigo-500" />
-          <span>Uygulamayı Şimdi Kilitle (Kilit Ekranını Test Et)</span>
-        </button>
+      {toastMessage && (
+        <p role="status" className="flex items-center gap-1.5 px-2 text-[13px] font-bold text-(--theme-accent)">
+          <Check className="w-4 h-4 shrink-0" /> {toastMessage}
+        </p>
       )}
 
-      {/* PIN Setup/Change Modal */}
       <SecurityLockModal
         isOpen={showSetupModal}
-        mode={setupMode}
+        mode="setup"
         onSuccess={() => {
           setShowSetupModal(false);
-          showToast('4 haneli PIN kodunuz başarıyla kaydedildi!');
+          showToast('PIN kaydedildi.');
           if (!isAppLockEnabled && !isRoomLockEnabled) {
             setIsAppLockEnabled(true);
           }

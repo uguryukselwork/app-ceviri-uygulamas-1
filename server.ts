@@ -82,7 +82,9 @@ async function startServer() {
     }
 
     // 1. Try Gemini API
-    if (ai && Date.now() > geminiDisabledUntil) {
+    // Try a second model when the first one is overloaded (503)
+    for (const model of ['gemini-3.8-flash', 'gemini-3.5-flash']) {
+      if (!ai || Date.now() <= geminiDisabledUntil) break;
       try {
         const prompt = `You are a professional, native-level translator. 
 Translate the following text into ${getLanguageName(target)}.
@@ -94,7 +96,7 @@ Text to translate:
 "${text}"`;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-1.5-flash',
+          model,
           contents: prompt,
           config: { temperature: 0.1 }
         });
@@ -109,7 +111,7 @@ Text to translate:
           console.warn('Gemini spending cap exceeded. Disabling Gemini for 10 minutes to use backup engines.');
           geminiDisabledUntil = Date.now() + 10 * 60 * 1000;
         } else {
-          console.warn('Gemini translation failed, using backup engine:', msg || err);
+          console.warn(`Gemini translation failed (${model}):`, msg || err);
         }
       }
     }

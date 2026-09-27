@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -9,7 +9,7 @@
     <meta property="og:description" content="A real-time translation messaging app for couples and friends speaking different languages." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="theme-color" content="#4F46E5" />
+    <meta name="theme-color" content="#FFF7F5" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -17,6 +17,9 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400..700&family=Nunito:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet" />
     <!-- Prevent bounce and keep fixed layout on mobile -->
     <style>
       html, body, #root {
@@ -31,13 +34,11 @@
     </style>
     <script>
       try {
-        const stored = localStorage.getItem('live-translate-storage');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed?.state?.colorTheme) {
-            document.documentElement.setAttribute('data-color-theme', parsed.state.colorTheme);
-          }
-        }
+        const stored = localStorage.getItem('livetranslate-storage');
+        const parsed = stored ? JSON.parse(stored) : null;
+        const colorTheme = parsed?.state?.colorTheme;
+        document.documentElement.setAttribute('data-color-theme', !colorTheme || (colorTheme === 'indigo' && !parsed.version) ? 'blush' : colorTheme);
+        if (parsed?.state?.theme === 'dark') document.documentElement.classList.add('dark');
       } catch (e) {}
     </script>
   </head>

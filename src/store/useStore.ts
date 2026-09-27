@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
+import type { User } from '@supabase/supabase-js';
 import { getBrowserLanguage } from '../lib/i18n';
 import { ColorThemeId, ChatPatternId, BubbleColorId } from '../lib/themes';
 
@@ -27,6 +28,10 @@ export interface UserProfile {
 }
 
 interface AppState {
+  // Supabase auth (not persisted; supabase-js keeps the session itself)
+  authUser: User | null;
+  authReady: boolean;
+  setAuthUser: (user: User | null) => void;
   profile: UserProfile;
   setProfile: (profile: Partial<UserProfile>) => void;
   theme: 'light' | 'dark';
@@ -84,6 +89,9 @@ interface AppState {
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
+      authUser: null,
+      authReady: false,
+      setAuthUser: (authUser) => set({ authUser, authReady: true }),
       profile: {
         id: uuidv4(),
         name: '',
@@ -98,16 +106,16 @@ export const useStore = create<AppState>()(
         })),
       theme: 'light',
       setTheme: (theme) => set({ theme }),
-      colorTheme: 'indigo',
+      colorTheme: 'blush',
       setColorTheme: (colorTheme) => set({ colorTheme }),
       bubbleColor: 'theme',
       setBubbleColor: (bubbleColor) => set({ bubbleColor }),
       chatPattern: 'none',
       setChatPattern: (chatPattern) => set({ chatPattern }),
       resetThemeSettings: () => {
-        set({ colorTheme: 'indigo', bubbleColor: 'theme', chatPattern: 'none' });
+        set({ colorTheme: 'blush', bubbleColor: 'theme', chatPattern: 'none' });
         if (typeof document !== 'undefined') {
-          document.documentElement.setAttribute('data-color-theme', 'indigo');
+          document.documentElement.setAttribute('data-color-theme', 'blush');
         }
       },
       soundEnabled: true,
@@ -195,6 +203,14 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'livetranslate-storage',
+      version: 1,
+      // v1: the soft "blush" theme replaced indigo as the default look
+      migrate: (persisted: any, version) => {
+        if (version < 1 && persisted?.colorTheme === 'indigo') {
+          persisted.colorTheme = 'blush';
+        }
+        return persisted;
+      },
       partialize: (state) => ({ 
         profile: state.profile, 
         theme: state.theme, 

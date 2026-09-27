@@ -1,4 +1,4 @@
-export type ColorThemeId = 'indigo' | 'emerald' | 'sunset' | 'midnight' | 'amethyst' | 'amber';
+export type ColorThemeId = 'blush' | 'indigo' | 'emerald' | 'sunset' | 'midnight' | 'amethyst' | 'amber';
 export type ChatPatternId = 'none' | 'dots' | 'grid' | 'doodles' | 'waves';
 export type BubbleColorId = 'theme' | 'indigo' | 'emerald' | 'rose' | 'amber' | 'violet' | 'cyan' | 'slate';
 
@@ -14,6 +14,16 @@ export interface ThemeConfig {
 }
 
 export const THEMES: ThemeConfig[] = [
+  {
+    id: 'blush',
+    name: 'Gül Kurusu',
+    emoji: '🌸',
+    accent: 'rose',
+    previewColors: ['#c8435f', '#f6b8a0'],
+    primaryButton: 'bg-(--theme-accent) hover:bg-(--theme-accent-hover) text-(--theme-on-accent)',
+    activeNav: 'text-(--theme-accent)',
+    bubbleClass: 'bg-(--theme-accent) text-(--theme-on-accent)',
+  },
   {
     id: 'indigo',
     name: 'Klasik İndigo',
@@ -77,7 +87,7 @@ export const THEMES: ThemeConfig[] = [
 ];
 
 export const BUBBLE_COLORS: { id: BubbleColorId; name: string; color: string; class: string }[] = [
-  { id: 'theme', name: 'Tema Rengi', color: '#6366f1', class: '' },
+  { id: 'theme', name: 'Tema Rengi', color: '#c8435f', class: '' },
   { id: 'indigo', name: 'İndigo', color: '#6366f1', class: 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white' },
   { id: 'emerald', name: 'Zümrüt', color: '#10b981', class: 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white' },
   { id: 'rose', name: 'Mercan', color: '#f43f5e', class: 'bg-gradient-to-br from-rose-500 to-pink-600 text-white' },

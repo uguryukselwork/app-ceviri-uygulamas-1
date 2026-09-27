@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, Sparkles, EyeOff, Zap, Bell, Check, X, ShieldCheck } from 'lucide-react';
+import { Crown, Sparkles, EyeOff, Zap, Check, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { IconTile, primaryButton, focusRing } from './ui';
+import { cn } from '../lib/utils';
 
 interface PremiumModalProps {
   isOpen: boolean;
@@ -9,6 +11,12 @@ interface PremiumModalProps {
   onSuccess?: () => void;
   featureTitle?: string;
 }
+
+const FEATURES = [
+  { icon: EyeOff, title: 'Profili gizle', desc: 'Odalarda adın "Gizli Kullanıcı" olarak görünür, fotoğrafın gizlenir.' },
+  { icon: Zap, title: 'Öncelikli çeviri', desc: 'Mesajların çeviri sırasında öne alınır.' },
+  { icon: Sparkles, title: 'VIP rozeti ve tüm sesler', desc: 'Profilinde taç rozeti, tüm bildirim melodileri açık.' },
+];
 
 export default function PremiumModal({ isOpen, onClose, onSuccess, featureTitle }: PremiumModalProps) {
   const { isPremium, setIsPremium } = useStore();
@@ -26,129 +34,77 @@ export default function PremiumModal({ isOpen, onClose, onSuccess, featureTitle 
     }, 1200);
   };
 
-  const handleCancelPremium = () => {
-    setIsPremium(false);
-  };
-
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div
+        className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label="LiveTranslate VIP"
+        onClick={onClose}
+      >
         <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 20 }}
-          className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-amber-200/50 dark:border-amber-500/20 overflow-hidden relative"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 40 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-md app-page-bg rounded-t-[2rem] sm:rounded-[2rem] border border-(--theme-border) shadow-2xl relative px-6 pt-8 pb-6"
         >
-          {/* Header Banner */}
-          <div className="bg-gradient-to-br from-amber-500 via-indigo-600 to-purple-600 p-6 text-white text-center relative overflow-hidden">
-            <div className="absolute top-2 right-2">
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-full bg-black/20 hover:bg-black/30 text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+          <button
+            onClick={onClose}
+            className={cn('absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center text-(--theme-muted) hover:text-(--theme-ink) hover:bg-(--theme-subtle-bg) transition-colors cursor-pointer', focusRing)}
+            aria-label="Kapat"
+          >
+            <X className="w-5 h-5" />
+          </button>
 
-            <div className="w-14 h-14 mx-auto mb-3 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/30">
-              <Crown className="w-8 h-8 text-amber-300 drop-shadow-md animate-pulse" />
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-(--theme-accent-light) text-(--theme-accent) flex items-center justify-center mb-4">
+              <Crown className="w-8 h-8" />
             </div>
-
-            <span className="inline-block px-3 py-0.5 mb-1 text-[11px] font-bold tracking-widest uppercase bg-amber-400 text-slate-900 rounded-full shadow-sm">
-              LiveTranslate VIP
-            </span>
-            <h3 className="text-xl font-bold tracking-tight">Premium Deneyimi</h3>
-            <p className="text-xs text-white/80 mt-1">
-              {featureTitle 
-                ? `"${featureTitle}" özelliğini kullanmak için Premium'a geçin.`
-                : 'Sohbetlerinizi gizli ve ayrıcalıklı bir seviyeye taşıyın.'}
+            <h3 className="font-display font-semibold text-2xl text-(--theme-ink)">LiveTranslate VIP</h3>
+            <p className="text-sm text-(--theme-muted) mt-1.5 max-w-[18rem]">
+              {featureTitle
+                ? `"${featureTitle}" VIP üyelere açık.`
+                : 'Sohbetlerini daha özel hale getir.'}
             </p>
           </div>
 
-          {/* Features List */}
-          <div className="p-6 space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0">
-                  <EyeOff className="w-4 h-4" />
+          <ul className="mt-6 space-y-4">
+            {FEATURES.map(({ icon: Icon, title, desc }) => (
+              <li key={title} className="flex items-start gap-3">
+                <IconTile><Icon className="w-[18px] h-[18px]" /></IconTile>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-bold text-(--theme-ink)">{title}</p>
+                  <p className="text-[13px] leading-snug text-(--theme-muted)">{desc}</p>
                 </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Profili Gizle (Gizli Mod)</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Odalarda adınız 'Gizli Kullanıcı' ve profil resminiz tamamen gizli görünür.
-                  </p>
-                </div>
-              </div>
+              </li>
+            ))}
+          </ul>
 
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                <div className="p-2 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-xl shrink-0">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Ultra Hızlı Çeviri</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Sohbetlerde öncelikli sunucu hattı ve sıfır gecikmeli çeviri motoru.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 rounded-xl shrink-0">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">VIP Rozeti & Sınırsız Sesler</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Özel altın taç rozeti ve tüm bildirim seslerine anında tam erişim.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Area */}
+          <div className="mt-7 space-y-2">
             {isPremium ? (
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-2xl border border-green-200 dark:border-green-800 text-xs font-semibold">
-                  <ShieldCheck className="w-4 h-4" />
-                  Premium Üyeliğiniz Aktif!
-                </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-full py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium rounded-xl text-sm transition-colors"
-                >
-                  Kapat
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelPremium}
-                  className="w-full py-1 text-xs text-slate-400 hover:text-red-500 transition-colors"
-                >
-                  Premium üyeliği sonlandır (Test Modu)
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2 pt-2">
-                <button
-                  type="button"
-                  onClick={handleActivate}
-                  disabled={celebrating}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 hover:from-amber-600 hover:via-indigo-700 hover:to-purple-700 text-white font-semibold rounded-2xl shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm"
-                >
-                  {celebrating ? (
-                    <>
-                      <Check className="w-4 h-4" /> Premium Aktifleştirildi!
-                    </>
-                  ) : (
-                    <>
-                      <Crown className="w-4 h-4 text-amber-300" /> Premium'u Ücretsiz Aktif Et
-                    </>
-                  )}
-                </button>
-                <p className="text-center text-[11px] text-slate-400">
-                  Deneme sürümü kapsamındadır. Herhangi bir kart gerekmez.
+              <>
+                <p className="flex items-center justify-center gap-2 py-3 rounded-[1.75rem] bg-(--theme-accent-light) text-(--theme-accent) text-sm font-bold">
+                  <Check className="w-4 h-4" /> VIP üyeliğin açık
                 </p>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPremium(false)}
+                  className={cn('w-full py-2 rounded-full text-[13px] font-bold text-(--theme-muted) hover:text-red-600 transition-colors cursor-pointer', focusRing)}
+                >
+                  VIP üyeliği bitir (test modu)
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={handleActivate} disabled={celebrating} className={primaryButton}>
+                  {celebrating ? <Check className="w-[18px] h-[18px]" /> : <Crown className="w-[18px] h-[18px]" />}
+                  {celebrating ? 'VIP açıldı' : "VIP'i ücretsiz aç"}
+                </button>
+                <p className="text-center text-xs text-(--theme-muted)">Deneme sürümü, kart bilgisi gerekmez.</p>
+              </>
             )}
           </div>
         </motion.div>
