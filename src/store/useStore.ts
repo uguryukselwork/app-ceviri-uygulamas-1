@@ -2,10 +2,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import type { User } from '@supabase/supabase-js';
-import { getBrowserLanguage } from '../lib/i18n';
-import { ColorThemeId, ChatPatternId, BubbleColorId } from '../lib/themes';
+import { getBrowserLanguage, getDefaultQuickMessages } from '../lib/i18n';
+import { ColorThemeId, ChatPatternId, BubbleColorId, themeForGender } from '../lib/themes';
 
 export type Gender = 'male' | 'female';
+
+// Served from public/; everyone starts with this picture until they pick their own
+export const DEFAULT_AVATAR = '/default-avatar.jpg';
 
 export interface SavedRoom {
   code: string;
@@ -82,7 +85,8 @@ interface AppState {
   addOrUpdateRoom: (room: SavedRoom) => void;
   removeRoom: (code: string) => void;
   updateRoomName: (code: string, customName: string) => void;
-  quickMessages: string[];
+  // null = the built-in set, shown in the current UI language
+  quickMessages: string[] | null;
   addQuickMessage: (msg: string) => void;
   removeQuickMessage: (msg: string) => void;
   updateQuickMessage: (oldMsg: string, newMsg: string) => void;
@@ -90,7 +94,7 @@ interface AppState {
 
 export const useStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       authUser: null,
       authReady: false,
       setAuthUser: (authUser) => set({ authUser, authReady: true }),
@@ -100,24 +104,31 @@ export const useStore = create<AppState>()(
         gender: null,
         language: getBrowserLanguage(),
         partnerLanguage: 'auto',
+        avatarUrl: DEFAULT_AVATAR,
         status: 'online',
       },
       setProfile: (updates) =>
-        set((state) => ({
-          profile: { ...state.profile, ...updates },
-        })),
+        set((state) => {
+          const profile = { ...state.profile, ...updates };
+          // Picking a gender switches to its matching light theme
+          if ('gender' in updates && updates.gender !== state.profile.gender) {
+            return { profile, colorTheme: themeForGender(profile.gender), theme: 'light' as const };
+          }
+          return { profile };
+        }),
       theme: 'light',
       setTheme: (theme) => set({ theme }),
-      colorTheme: 'blush',
+      colorTheme: 'indigo',
       setColorTheme: (colorTheme) => set({ colorTheme }),
       bubbleColor: 'theme',
       setBubbleColor: (bubbleColor) => set({ bubbleColor }),
       chatPattern: 'none',
       setChatPattern: (chatPattern) => set({ chatPattern }),
       resetThemeSettings: () => {
-        set({ colorTheme: 'blush', bubbleColor: 'theme', chatPattern: 'none' });
+        const colorTheme = themeForGender(get().profile.gender);
+        set({ colorTheme, bubbleColor: 'theme', chatPattern: 'none' });
         if (typeof document !== 'undefined') {
-          document.documentElement.setAttribute('data-color-theme', 'blush');
+          document.documentElement.setAttribute('data-color-theme', colorTheme);
         }
       },
       soundEnabled: true,
@@ -184,34 +195,45 @@ export const useStore = create<AppState>()(
             r.code === code ? { ...r, customName } : r
           )
         })),
-      quickMessages: ['Tamam', 'Seni seviyorum', 'Görüşürüz', 'Nasılsın?'],
+      quickMessages: null,
+      // Editing the built-in set freezes it in the language it was shown in
       addQuickMessage: (msg) => 
         set((state) => {
-          if (!state.quickMessages.includes(msg)) {
-            return { quickMessages: [...state.quickMessages, msg] };
+          const current = state.quickMessages ?? getDefaultQuickMessages(state.profile.language);
+          if (!current.includes(msg)) {
+            return { quickMessages: [...current, msg] };
           }
           return state;
         }),
       removeQuickMessage: (msg) =>
         set((state) => ({
-          quickMessages: state.quickMessages.filter(m => m !== msg)
+          quickMessages: (state.quickMessages ?? getDefaultQuickMessages(state.profile.language)).filter(m => m !== msg)
         })),
       updateQuickMessage: (oldMsg, newMsg) =>
         set((state) => {
           const trimmed = newMsg.trim();
           if (!trimmed) return state;
           return {
-            quickMessages: state.quickMessages.map(m => m === oldMsg ? trimmed : m)
+            quickMessages: (state.quickMessages ?? getDefaultQuickMessages(state.profile.language)).map(m => m === oldMsg ? trimmed : m)
           };
         }),
     }),
     {
       name: 'livetranslate-storage',
-      version: 1,
+      version: 3,
       // v1: the soft "blush" theme replaced indigo as the default look
+      // v2: untouched Turkish quick messages become the language-aware built-in set
+      // v3: profiles without a picture get the default avatar
       migrate: (persisted: any, version) => {
         if (version < 1 && persisted?.colorTheme === 'indigo') {
           persisted.colorTheme = 'blush';
+        }
+        if (version < 2 && Array.isArray(persisted?.quickMessages)
+          && persisted.quickMessages.join('|') === 'Tamam|Seni seviyorum|Görüşürüz|Nasılsın?') {
+          persisted.quickMessages = null;
+        }
+        if (version < 3 && persisted?.profile && !persisted.profile.avatarUrl) {
+          persisted.profile.avatarUrl = DEFAULT_AVATAR;
         }
         return persisted;
       },

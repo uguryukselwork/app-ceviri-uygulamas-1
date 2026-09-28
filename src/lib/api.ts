@@ -124,6 +124,8 @@ export function subscribeToRoom(roomId: string, handlers: {
   onMessageInsert: (m: MessageType) => void;
   onMessageUpdate: (m: MessageType) => void;
   onParticipantsChange: () => void;
+  /** Fires on every (re)connect; events sent while disconnected are lost, so callers resync here */
+  onSubscribed?: () => void;
 }): () => void {
   const channel: RealtimeChannel = supabase
     .channel(`room:${roomId}`)
@@ -133,6 +135,8 @@ export function subscribeToRoom(roomId: string, handlers: {
       (payload) => handlers.onMessageUpdate(payload.new as MessageType))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `room_id=eq.${roomId}` },
       () => handlers.onParticipantsChange())
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') handlers.onSubscribed?.();
+    });
   return () => { void supabase.removeChannel(channel); };
 }

@@ -105,6 +105,13 @@ export const CHAT_PATTERNS: { id: ChatPatternId; name: string; icon: string }[] 
   { id: 'waves', name: 'Dalgalar', icon: '〰️' },
 ];
 
+// Default look per gender: Gece Okyanusu for men, Gül Kurusu for women, Klasik İndigo otherwise
+export function themeForGender(gender: 'male' | 'female' | null | undefined): ColorThemeId {
+  if (gender === 'male') return 'midnight';
+  if (gender === 'female') return 'blush';
+  return 'indigo';
+}
+
 export function getBubbleClass(bubbleColor: string, colorTheme: ColorThemeId): string {
   if (bubbleColor && bubbleColor !== 'theme') {
     const found = BUBBLE_COLORS.find(b => b.id === bubbleColor);

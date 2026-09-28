@@ -20,10 +20,10 @@ export default function TypographySettingsSection() {
   const { fontSize, setFontSize, fontFamily, setFontFamily } = useStore();
   const [resetDone, setResetDone] = useState(false);
 
-  const isDefault = fontSize === 'medium' && fontFamily === 'sans';
+  const isDefault = fontSize === 'large' && fontFamily === 'sans';
 
   const handleReset = () => {
-    setFontSize('medium');
+    setFontSize('large');
     setFontFamily('sans');
     setResetDone(true);
     setTimeout(() => setResetDone(false), 2000);

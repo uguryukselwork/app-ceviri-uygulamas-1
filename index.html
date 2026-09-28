@@ -37,7 +37,7 @@
         const stored = localStorage.getItem('livetranslate-storage');
         const parsed = stored ? JSON.parse(stored) : null;
         const colorTheme = parsed?.state?.colorTheme;
-        document.documentElement.setAttribute('data-color-theme', !colorTheme || (colorTheme === 'indigo' && !parsed.version) ? 'blush' : colorTheme);
+        document.documentElement.setAttribute('data-color-theme', !colorTheme ? 'indigo' : (colorTheme === 'indigo' && !parsed.version) ? 'blush' : colorTheme);
         if (parsed?.state?.theme === 'dark') document.documentElement.classList.add('dark');
       } catch (e) {}
     </script>

@@ -41,6 +41,7 @@ export default function SecuritySettingsSection() {
     <div className="space-y-2">
       <SettingsGroup title="Güvenlik">
         <SettingsRow
+          tone="rose"
           icon={appPin ? <Lock className="w-[18px] h-[18px]" /> : <Unlock className="w-[18px] h-[18px]" />}
           title="PIN kodu"
           description={appPin ? '4 haneli PIN ayarlı.' : 'Uygulamayı ve odaları kilitlemek için bir PIN oluştur.'}
@@ -57,6 +58,7 @@ export default function SecuritySettingsSection() {
           }
         />
         <SettingsRow
+          tone="amber"
           icon={<KeyRound className="w-[18px] h-[18px]" />}
           title="Açılışta kilitle"
           description="Uygulama açılırken PIN sorulur."
@@ -64,6 +66,7 @@ export default function SecuritySettingsSection() {
           trailing={<Toggle label="Açılışta kilitle" disabled={!appPin} checked={isAppLockEnabled && !!appPin} onChange={setIsAppLockEnabled} />}
         />
         <SettingsRow
+          tone="violet"
           icon={<DoorClosed className="w-[18px] h-[18px]" />}
           title="Odalara girişte kilitle"
           description="Her odaya girerken PIN sorulur."
@@ -71,6 +74,7 @@ export default function SecuritySettingsSection() {
           trailing={<Toggle label="Odalara girişte kilitle" disabled={!appPin} checked={isRoomLockEnabled && !!appPin} onChange={setIsRoomLockEnabled} />}
         />
         <SettingsRow
+          tone="teal"
           icon={<Fingerprint className="w-[18px] h-[18px]" />}
           title="Parmak izi veya yüz tanıma"
           description="PIN yerine tek dokunuşla aç."

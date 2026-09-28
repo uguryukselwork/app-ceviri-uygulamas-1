@@ -62,7 +62,7 @@ export default function App() {
   }, [theme]);
 
   React.useEffect(() => {
-    document.documentElement.setAttribute('data-color-theme', colorTheme || 'blush');
+    document.documentElement.setAttribute('data-color-theme', colorTheme || 'indigo');
   }, [colorTheme]);
 
   React.useEffect(() => {

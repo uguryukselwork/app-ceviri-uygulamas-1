@@ -130,7 +130,11 @@ export default function RoomHeader({ roomCode, partnerName, partnerGender, partn
               </h2>
               <p className="text-xs font-semibold text-(--theme-muted) truncate">
                 {hasPartner ? statusText : t('room.connecting', profile.language)}
-                {participantsCount > 2 && `, ${participantsCount} kişi`}
+                {participantsCount > 0 && (
+                  <span className="inline-flex items-center gap-0.5 ml-1.5 align-middle">
+                    · <Users className="w-3 h-3 ml-1" aria-hidden />{participantsCount}
+                  </span>
+                )}
               </p>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { RotateCcw, Check } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { THEMES, BUBBLE_COLORS, CHAT_PATTERNS, getBubbleClass, getChatPatternStyle, ColorThemeId, BubbleColorId, ChatPatternId } from '../lib/themes';
+import { THEMES, BUBBLE_COLORS, CHAT_PATTERNS, getBubbleClass, getChatPatternStyle, themeForGender, ColorThemeId, BubbleColorId, ChatPatternId } from '../lib/themes';
 import { SettingsGroup, focusRing } from './ui';
 import { cn } from '../lib/utils';
 
@@ -15,12 +15,13 @@ export default function ThemeSettingsSection() {
     setChatPattern,
     resetThemeSettings,
     theme,
+    profile,
   } = useStore();
 
   const [resetDone, setResetDone] = useState(false);
 
   const isDark = theme === 'dark';
-  const isDefaultTheme = colorTheme === 'blush' && bubbleColor === 'theme' && chatPattern === 'none';
+  const isDefaultTheme = colorTheme === themeForGender(profile.gender) && bubbleColor === 'theme' && chatPattern === 'none';
 
   const handleReset = () => {
     resetThemeSettings();

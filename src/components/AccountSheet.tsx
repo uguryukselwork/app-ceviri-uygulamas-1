@@ -104,6 +104,7 @@ export default function AccountSheet({ open, onClose, onOpenSettings, reason }: 
   // Already running from the home screen: nothing to install
   const installRow = !isInstalledApp() && (
     <SettingsRow
+      tone="blue"
       icon={<Download className="w-[18px] h-[18px]" />}
       title="Uygulamayı indir"
       description="Ana ekrana ekle, iPhone ve Android rehberi"
@@ -175,6 +176,7 @@ export default function AccountSheet({ open, onClose, onOpenSettings, reason }: 
 
                 <SettingsGroup>
                   <SettingsRow
+                    tone="slate"
                     icon={<SettingsIcon className="w-[18px] h-[18px]" />}
                     title="Ayarlar"
                     description="Dil, görünüm, bildirimler, güvenlik"
@@ -183,6 +185,7 @@ export default function AccountSheet({ open, onClose, onOpenSettings, reason }: 
                   />
                   {installRow}
                   <SettingsRow
+                    tone="red"
                     icon={signingOut ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <LogOut className="w-[18px] h-[18px]" />}
                     title="Çıkış yap"
                     description={guest ? 'Misafir hesabından çıkınca odalarına bu cihazdan da erişemezsin.' : undefined}
@@ -207,6 +210,7 @@ export default function AccountSheet({ open, onClose, onOpenSettings, reason }: 
                 <SettingsGroup>
                   {installRow}
                   <SettingsRow
+                    tone="slate"
                     icon={<SettingsIcon className="w-[18px] h-[18px]" />}
                     title="Ayarlar"
                     onClick={() => { close(); onOpenSettings(); }}

@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore';
 import { t, LANGUAGES, plainLanguageName } from '../lib/i18n';
 import { THEMES } from '../lib/themes';
 import { compressImage, playNotificationSound } from '../lib/utils';
-import { SettingsGroup, SettingsRow, SheetHeader, Toggle, Segmented, fieldClass, focusRing, primaryButton } from './ui';
+import { SettingsGroup, SettingsRow, SheetHeader, Toggle, fieldClass, focusRing, primaryButton } from './ui';
 import ThemeSettingsSection from './ThemeSettingsSection';
 import TypographySettingsSection from './TypographySettingsSection';
 import SecuritySettingsSection from './SecuritySettingsSection';
@@ -17,6 +17,10 @@ const SOUNDS = [
   { id: 'chime', label: 'Zil' },
   { id: 'bell', label: 'Çan' },
   { id: 'digital', label: 'Dijital' },
+  { id: 'drop', label: 'Damla' },
+  { id: 'marimba', label: 'Marimba' },
+  { id: 'harp', label: 'Arp' },
+  { id: 'crystal', label: 'Kristal' },
 ];
 
 const FONT_SIZE_NAMES = { small: 'Küçük', medium: 'Standart', large: 'Büyük' } as const;
@@ -192,11 +196,13 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
 
                   <SettingsGroup title={t('room.appearance', lang)}>
                     <SettingsRow
+                      tone="indigo"
                       icon={<Moon className="w-[18px] h-[18px]" />}
                       title="Gece modu"
                       trailing={<Toggle label="Gece modu" checked={theme === 'dark'} onChange={(v) => setTheme(v ? 'dark' : 'light')} />}
                     />
                     <SettingsRow
+                      tone="rainbow"
                       icon={<Palette className="w-[18px] h-[18px]" />}
                       title="Tema ve renkler"
                       description={THEMES.find(x => x.id === colorTheme)?.name}
@@ -204,6 +210,7 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
                       chevron
                     />
                     <SettingsRow
+                      tone="sky"
                       icon={<Type className="w-[18px] h-[18px]" />}
                       title="Yazı tipi ve boyut"
                       description={`${FONT_FAMILY_NAMES[fontFamily]}, ${FONT_SIZE_NAMES[fontSize].toLocaleLowerCase('tr')}`}
@@ -212,6 +219,7 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
                     />
                     {room && (
                       <SettingsRow
+                        tone="teal"
                         icon={<Captions className="w-[18px] h-[18px]" />}
                         title={t('room.show_original', lang)}
                         description="Gelen mesajın çevirisinin altında orijinal hali de görünür."
@@ -222,6 +230,7 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
 
                   <SettingsGroup title="Bildirimler">
                     <SettingsRow
+                      tone="orange"
                       icon={<Bell className="w-[18px] h-[18px]" />}
                       title="Bildirim sesi"
                       trailing={<Toggle label="Bildirim sesi" checked={soundEnabled} onChange={setSoundEnabled} />}
@@ -238,35 +247,50 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
                         </button>
                       </div>
                       <div className="space-y-2">
-                        <Segmented
-                          label="Melodi"
-                          options={SOUNDS}
-                          value={notificationSound}
-                          onChange={(id) => {
-                            setNotificationSound(id);
-                            playNotificationSound(id, soundVolume);
-                          }}
-                        />
-                        <div className="flex items-center gap-3">
-                          <span className="text-[13px] font-bold text-(--theme-ink)">Ses seviyesi</span>
+                        <div role="radiogroup" aria-label="Melodi" className="grid grid-cols-4 gap-1 p-1 rounded-3xl bg-(--theme-subtle-bg)">
+                          {SOUNDS.map((sound) => {
+                            const selected = notificationSound === sound.id;
+                            return (
+                              <button
+                                key={sound.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected}
+                                onClick={() => {
+                                  setNotificationSound(sound.id);
+                                  playNotificationSound(sound.id, soundVolume);
+                                }}
+                                className={cn(
+                                  'min-w-0 py-2 px-1 rounded-full text-[13px] font-bold transition-colors cursor-pointer truncate',
+                                  selected ? 'bg-(--theme-card-bg) text-(--theme-accent) shadow-sm' : 'text-(--theme-muted) hover:text-(--theme-ink)',
+                                  focusRing
+                                )}
+                              >
+                                {sound.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <label className="flex items-center gap-3 pt-1">
+                          <span className="text-[13px] font-bold text-(--theme-ink) shrink-0">Ses seviyesi</span>
                           <input
                             type="range"
                             min="0"
                             max="1"
                             step="0.05"
                             value={soundVolume}
-                            onChange={(e) => {
-                              const vol = parseFloat(e.target.value);
-                              setSoundVolume(vol);
-                              // Play a preview sound at the selected volume
-                              playNotificationSound(notificationSound, vol);
-                            }}
-                            className="w-24"
+                            onChange={(e) => setSoundVolume(parseFloat(e.target.value))}
+                            // Preview once the slider is released, not on every step
+                            onPointerUp={() => playNotificationSound(notificationSound, soundVolume)}
+                            onKeyUp={() => playNotificationSound(notificationSound, soundVolume)}
+                            className="flex-1 accent-(--theme-accent) cursor-pointer"
                           />
-                        </div>
+                          <span className="w-9 text-right text-[13px] font-bold text-(--theme-muted) tabular-nums">{Math.round(soundVolume * 100)}%</span>
+                        </label>
                       </div>
                     </div>
                     <SettingsRow
+                      tone="emerald"
                       icon={<Smartphone className="w-[18px] h-[18px]" />}
                       title="Titreşim"
                       description="Yeni mesaj gelince telefon titrer."
@@ -278,6 +302,7 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
 
                   <SettingsGroup title="Gizlilik">
                     <SettingsRow
+                      tone="amber"
                       icon={<Crown className="w-[18px] h-[18px]" />}
                       title={isPremium ? 'VIP üyelik açık' : 'LiveTranslate VIP'}
                       description={isPremium ? 'Tüm ayrıcalıklar kullanımda.' : 'Gizli profil ve diğer ayrıcalıklar.'}
@@ -292,6 +317,7 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
                       }
                     />
                     <SettingsRow
+                      tone="slate"
                       icon={<EyeOff className="w-[18px] h-[18px]" />}
                       title="Profili gizle"
                       description={isPremium
@@ -310,6 +336,7 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
                   {deferredPrompt && (
                     <SettingsGroup>
                       <SettingsRow
+                        tone="blue"
                         icon={<Download className="w-[18px] h-[18px]" />}
                         title="Ana ekrana ekle"
                         description="LiveTranslate'i uygulama gibi aç."

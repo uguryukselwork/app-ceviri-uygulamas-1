@@ -23,7 +23,7 @@ export default function Room() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const {
-    profile, theme, soundEnabled, notificationSound, hideProfile, vibrationEnabled,
+    profile, theme, soundEnabled, notificationSound, soundVolume, hideProfile, vibrationEnabled,
     savedRooms, addOrUpdateRoom, removeRoom, updateRoomName,
     chatPattern, appPin, isRoomLockEnabled, lockedRooms, unlockedRooms, unlockRoom, toggleRoomLock
   } = useStore();
@@ -68,8 +68,21 @@ export default function Room() {
   }, [messages, roomId, profile.id]);
 
   // Latest notification preferences, read inside the realtime callback without resubscribing
-  const notifyPrefs = useRef({ soundEnabled, notificationSound, vibrationEnabled });
-  notifyPrefs.current = { soundEnabled, notificationSound, vibrationEnabled };
+  const notifyPrefs = useRef({ soundEnabled, notificationSound, soundVolume, vibrationEnabled });
+  notifyPrefs.current = { soundEnabled, notificationSound, soundVolume, vibrationEnabled };
+  // Message ids already seen, so each incoming message rings exactly once
+  const knownIds = useRef(new Set<string>());
+
+  const notifyIncoming = (msgs: MessageType[]) => {
+    const fresh = msgs.filter(m => !knownIds.current.has(m.id));
+    fresh.forEach(m => knownIds.current.add(m.id));
+    if (!fresh.some(m => m.sender_id !== profile.id)) return;
+    const { soundEnabled, notificationSound, soundVolume, vibrationEnabled } = notifyPrefs.current;
+    if (soundEnabled) playNotificationSound(notificationSound, soundVolume);
+    if (vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(100); } catch { /* not allowed */ }
+    }
+  };
 
   const participantInput = () => ({
     name: hideProfile ? 'Gizli Kullanıcı' : (profile.name || 'Misafir'),
@@ -85,6 +98,7 @@ export default function Room() {
 
     let mounted = true;
     let unsubscribe: (() => void) | null = null;
+    let onResync: (() => void) | null = null;
 
     const loadParticipants = async (rId: string) => {
       const data = await fetchParticipants(rId);
@@ -117,23 +131,37 @@ export default function Room() {
 
         const initialMessages = await fetchMessages(room.id);
         if (!mounted) return;
+        knownIds.current = new Set(initialMessages.map(m => m.id));
         setMessages(initialMessages);
         setIsConnected(true);
+
+        // Catch up on anything missed while the socket was down or the phone was asleep
+        let subscribedOnce = false;
+        const resync = async () => {
+          try {
+            const latest = await fetchMessages(room.id);
+            if (!mounted) return;
+            notifyIncoming(latest);
+            setMessages(prev => {
+              const fetched = new Set(latest.map(m => m.id));
+              return [...latest, ...prev.filter(m => !fetched.has(m.id))];
+            });
+          } catch (e) {
+            console.error('Resync error:', e);
+          }
+        };
+        onResync = () => { if (document.visibilityState === 'visible') void resync(); };
+        document.addEventListener('visibilitychange', onResync);
 
         unsubscribe = subscribeToRoom(room.id, {
           onMessageInsert: (msg) => {
             if (!mounted) return;
-            setMessages(prev => {
-              if (prev.some(m => m.id === msg.id)) return prev;
-              const { soundEnabled, notificationSound, vibrationEnabled } = notifyPrefs.current;
-              if (msg.sender_id !== profile.id) {
-                if (soundEnabled) playNotificationSound(notificationSound);
-                if (vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
-                  try { navigator.vibrate(100); } catch { /* not allowed */ }
-                }
-              }
-              return [...prev, msg];
-            });
+            notifyIncoming([msg]);
+            setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+          },
+          onSubscribed: () => {
+            if (subscribedOnce) void resync();
+            subscribedOnce = true;
           },
           onMessageUpdate: (msg) => {
             if (mounted) setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, ...msg } : m));
@@ -151,6 +179,7 @@ export default function Room() {
     return () => {
       mounted = false;
       unsubscribe?.();
+      if (onResync) document.removeEventListener('visibilitychange', onResync);
       setIsConnected(false);
     };
   }, [roomCode, profile.id]);

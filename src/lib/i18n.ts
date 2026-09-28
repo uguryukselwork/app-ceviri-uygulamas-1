@@ -24,6 +24,23 @@ export const getBrowserLanguage = () => {
   return LANGUAGES.find(l => l.code === lang) ? lang : 'en';
 };
 
+const DEFAULT_QUICK_MESSAGES: Record<string, string[]> = {
+  tr: ['Tamam', 'Seni seviyorum', 'Görüşürüz', 'Nasılsın?'],
+  en: ['OK', 'I love you', 'See you', 'How are you?'],
+  de: ['Okay', 'Ich liebe dich', 'Bis später', 'Wie geht es dir?'],
+  fr: ["D'accord", "Je t'aime", 'À plus tard', 'Comment ça va ?'],
+  es: ['Vale', 'Te quiero', 'Nos vemos', '¿Cómo estás?'],
+  it: ['Va bene', 'Ti amo', 'Ci vediamo', 'Come stai?'],
+  ru: ['Хорошо', 'Я тебя люблю', 'Увидимся', 'Как дела?'],
+  ar: ['حسنًا', 'أحبك', 'أراك لاحقًا', 'كيف حالك؟'],
+  ja: ['わかった', '愛してる', 'またね', '元気？'],
+  ko: ['알겠어', '사랑해', '또 봐', '잘 지내?'],
+  th: ['โอเค', 'ฉันรักคุณ', 'แล้วเจอกัน', 'สบายดีไหม?'],
+  tk: ['Bolýar', 'Men seni söýýärin', 'Görüşýänçäk', 'Ýagdaýlaryň nähili?'],
+};
+
+export const getDefaultQuickMessages = (lang: string) => DEFAULT_QUICK_MESSAGES[lang] || DEFAULT_QUICK_MESSAGES.en;
+
 const translations: Record<string, Record<string, string>> = {
   tr: {
     // UI strings
@@ -104,7 +121,16 @@ const translations: Record<string, Record<string, string>> = {
     'msg.delivered': 'İletildi',
     'msg.seen': 'Görüldü',
     'common.save': 'Kaydet',
-    'common.saved': 'Kaydedildi'
+    'common.saved': 'Kaydedildi',
+    'quick.title': 'Hazır Mesajlar',
+    'quick.empty': 'Henüz hazır mesaj yok. Sık yazdıklarını aşağıya ekle.',
+    'quick.new': 'Yeni hazır mesaj',
+    'quick.edit_placeholder': 'Mesajı düzenle...',
+    'common.edit': 'Düzenle',
+    'common.delete': 'Sil',
+    'common.cancel': 'İptal',
+    'common.add': 'Ekle',
+    'common.close': 'Kapat'
   },
   en: {
     'home.title': 'LiveTranslate',
@@ -184,7 +210,16 @@ const translations: Record<string, Record<string, string>> = {
     'msg.delivered': 'Delivered',
     'msg.seen': 'Seen',
     'common.save': 'Save',
-    'common.saved': 'Saved'
+    'common.saved': 'Saved',
+    'quick.title': 'Quick Messages',
+    'quick.empty': 'No quick messages yet. Add the ones you type often below.',
+    'quick.new': 'New quick message',
+    'quick.edit_placeholder': 'Edit message...',
+    'common.edit': 'Edit',
+    'common.delete': 'Delete',
+    'common.cancel': 'Cancel',
+    'common.add': 'Add',
+    'common.close': 'Close'
   }
 };
 

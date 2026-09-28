@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase, supabaseUrl, supabaseKey } from './supabase';
-import { useStore } from '../store/useStore';
+import { useStore, DEFAULT_AVATAR } from '../store/useStore';
 
 /** Google sign-in; Supabase redirects back to the page the user is on (e.g. a shared room link) */
 export async function signInWithGoogle() {
@@ -54,7 +54,7 @@ export function useAuthSync() {
         id: user.id,
         // Fill in from Google only where the user hasn't set something themselves
         name: profile.name || meta.full_name || meta.name || '',
-        avatarUrl: profile.avatarUrl || meta.avatar_url || meta.picture || undefined,
+        avatarUrl: (profile.avatarUrl !== DEFAULT_AVATAR && profile.avatarUrl) || meta.avatar_url || meta.picture || DEFAULT_AVATAR,
       });
     };
 

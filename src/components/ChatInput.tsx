@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Zap, Plus, X, Pencil, Trash2, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
-import { t } from '../lib/i18n';
+import { t, getDefaultQuickMessages } from '../lib/i18n';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -10,7 +10,9 @@ interface ChatInputProps {
 }
 
 export default function ChatInput({ onSend, disabled }: ChatInputProps) {
-  const { profile, quickMessages, addQuickMessage, removeQuickMessage, updateQuickMessage } = useStore();
+  const { profile, quickMessages: savedQuickMessages, addQuickMessage, removeQuickMessage, updateQuickMessage } = useStore();
+  const quickMessages = savedQuickMessages ?? getDefaultQuickMessages(profile.language);
+  const lang = profile.language;
   const [text, setText] = useState('');
   const [showQuickMessages, setShowQuickMessages] = useState(false);
   const [newQuickMsg, setNewQuickMsg] = useState('');
@@ -107,7 +109,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
               <div className="pl-4 pr-2 py-2 border-b border-(--theme-border) flex justify-between items-center">
                 <span className="flex items-center gap-1.5 font-bold text-sm text-(--theme-ink)">
                   <Zap className="w-4 h-4 text-(--theme-accent)" />
-                  Hazır Mesajlar
+                  {t('quick.title', lang)}
                 </span>
                 <button 
                   type="button"
@@ -115,7 +117,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                     setShowQuickMessages(false);
                     setEditingMsg(null);
                   }} 
-                  aria-label="Kapat"
+                  aria-label={t('common.close', lang)}
                   className="w-8 h-8 flex items-center justify-center rounded-full text-(--theme-muted) hover:text-(--theme-ink) hover:bg-(--theme-subtle-bg) transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
@@ -123,7 +125,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
               </div>
               <div className="max-h-56 overflow-y-auto p-2 space-y-0.5">
                 {quickMessages.length === 0 ? (
-                  <p className="text-sm text-center text-(--theme-muted) py-4 px-3">Henüz hazır mesaj yok. Sık yazdıklarını aşağıya ekle.</p>
+                  <p className="text-sm text-center text-(--theme-muted) py-4 px-3">{t('quick.empty', lang)}</p>
                 ) : (
                   quickMessages.map((msg, index) => (
                     <div key={`${msg}-${index}`}>
@@ -134,7 +136,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                             value={editText}
                             onChange={(e) => setEditText(e.target.value)}
                             autoFocus
-                            placeholder="Mesajı düzenle..."
+                            placeholder={t('quick.edit_placeholder', lang)}
                             className="flex-1 min-w-0 bg-(--theme-card-bg) border-2 border-transparent rounded-xl px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-(--theme-accent) text-(--theme-ink)"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
@@ -147,18 +149,18 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                           />
                           <button
                             type="button"
-                            title="Kaydet"
+                            title={t('common.save', lang)}
                             onClick={handleSaveEdit}
-                            aria-label="Kaydet"
+                            aria-label={t('common.save', lang)}
                             className="w-8 h-8 flex items-center justify-center text-(--theme-accent) hover:bg-(--theme-card-bg) rounded-full transition-colors cursor-pointer"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
-                            title="İptal"
+                            title={t('common.cancel', lang)}
                             onClick={handleCancelEdit}
-                            aria-label="İptal"
+                            aria-label={t('common.cancel', lang)}
                             className="w-8 h-8 flex items-center justify-center text-(--theme-muted) hover:text-(--theme-ink) hover:bg-(--theme-card-bg) rounded-full transition-colors cursor-pointer"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -180,24 +182,24 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
-                              title="Düzenle"
+                              title={t('common.edit', lang)}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 startEditing(msg);
                               }}
-                              aria-label="Düzenle"
+                              aria-label={t('common.edit', lang)}
                               className="w-8 h-8 flex items-center justify-center text-(--theme-muted) hover:text-(--theme-accent) hover:bg-(--theme-accent-light) rounded-full transition-colors cursor-pointer"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
-                              title="Sil"
+                              title={t('common.delete', lang)}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 removeQuickMessage(msg);
                               }}
-                              aria-label="Sil"
+                              aria-label={t('common.delete', lang)}
                               className="w-8 h-8 flex items-center justify-center text-(--theme-muted) hover:text-red-600 hover:bg-red-500/10 rounded-full transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -214,8 +216,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                   type="text" 
                   value={newQuickMsg}
                   onChange={(e) => setNewQuickMsg(e.target.value)}
-                  placeholder="Yeni hazır mesaj"
-                  aria-label="Yeni hazır mesaj"
+                  placeholder={t('quick.new', lang)}
+                  aria-label={t('quick.new', lang)}
                   className="flex-1 min-w-0 bg-(--theme-subtle-bg) border-2 border-transparent rounded-full px-3.5 py-1.5 text-sm font-semibold outline-none focus:border-(--theme-accent) text-(--theme-ink) placeholder:text-(--theme-muted)"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -229,7 +231,8 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
                 />
                 <button
                   type="button"
-                  title="Ekle"
+                  title={t('common.add', lang)}
+                  aria-label={t('common.add', lang)}
                   onClick={() => {
                     if (newQuickMsg.trim()) {
                       addQuickMessage(newQuickMsg.trim());
