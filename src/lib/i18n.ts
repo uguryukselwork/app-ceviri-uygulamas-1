@@ -100,7 +100,11 @@ const translations: Record<string, Record<string, string>> = {
     'msg.translating': 'Çevriliyor...',
     'msg.retry': 'Tekrar Çevir',
     'msg.copy': 'Kopyala',
-    'msg.copied': 'Kopyalandı'
+    'msg.copied': 'Kopyalandı',
+    'msg.delivered': 'İletildi',
+    'msg.seen': 'Görüldü',
+    'common.save': 'Kaydet',
+    'common.saved': 'Kaydedildi'
   },
   en: {
     'home.title': 'LiveTranslate',
@@ -176,7 +180,11 @@ const translations: Record<string, Record<string, string>> = {
     'msg.translating': 'Translating...',
     'msg.retry': 'Retry',
     'msg.copy': 'Copy',
-    'msg.copied': 'Copied'
+    'msg.copied': 'Copied',
+    'msg.delivered': 'Delivered',
+    'msg.seen': 'Seen',
+    'common.save': 'Save',
+    'common.saved': 'Saved'
   }
 };
 

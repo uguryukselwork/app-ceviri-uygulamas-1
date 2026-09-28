@@ -1,11 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Moon, Palette, Type, Bell, Smartphone, Crown, EyeOff, Download, Play, Camera, ChevronDown, LogOut, Captions } from 'lucide-react';
+import { Moon, Palette, Type, Bell, Smartphone, Crown, EyeOff, Download, Play, Camera, ChevronDown, LogOut, Captions, Check } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { t, LANGUAGES, plainLanguageName } from '../lib/i18n';
 import { THEMES } from '../lib/themes';
 import { compressImage, playNotificationSound } from '../lib/utils';
-import { SettingsGroup, SettingsRow, SheetHeader, Toggle, Segmented, fieldClass, focusRing } from './ui';
+import { SettingsGroup, SettingsRow, SheetHeader, Toggle, Segmented, fieldClass, focusRing, primaryButton } from './ui';
 import ThemeSettingsSection from './ThemeSettingsSection';
 import TypographySettingsSection from './TypographySettingsSection';
 import SecuritySettingsSection from './SecuritySettingsSection';
@@ -67,6 +67,24 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lang = profile.language;
+
+  // Language choices are drafts until "Kaydet" is pressed
+  const [draftLanguage, setDraftLanguage] = useState(profile.language);
+  const [draftPartnerLanguage, setDraftPartnerLanguage] = useState(profile.partnerLanguage || 'auto');
+  const [languageSaved, setLanguageSaved] = useState(false);
+  useEffect(() => {
+    if (open) {
+      setDraftLanguage(profile.language);
+      setDraftPartnerLanguage(profile.partnerLanguage || 'auto');
+      setLanguageSaved(false);
+    }
+  }, [open]);
+  const languageDirty = draftLanguage !== profile.language || (!!room && draftPartnerLanguage !== (profile.partnerLanguage || 'auto'));
+  const saveLanguages = () => {
+    setProfile(room ? { language: draftLanguage, partnerLanguage: draftPartnerLanguage } : { language: draftLanguage });
+    setLanguageSaved(true);
+    setTimeout(() => setLanguageSaved(false), 2000);
+  };
 
   const close = () => {
     onClose();
@@ -148,19 +166,27 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
                   )}
 
                   <SettingsGroup title="Dil">
-                    <LanguageField label={t('room.my_language', lang)} value={profile.language} onChange={(v) => setProfile({ language: v })}>
+                    <LanguageField label={t('room.my_language', lang)} value={draftLanguage} onChange={setDraftLanguage}>
                       {languageOptions.map(l => <option key={l.code} value={l.code}>{plainLanguageName(l.name)}</option>)}
                     </LanguageField>
                     {room && (
                       <LanguageField
                         label={t('room.partner_language', lang)}
-                        value={profile.partnerLanguage || 'auto'}
-                        onChange={(v) => setProfile({ partnerLanguage: v })}
+                        value={draftPartnerLanguage}
+                        onChange={setDraftPartnerLanguage}
                         hint={t('room.auto_desc', lang, { lang: room.partnerLanguageName })}
                       >
                         <option value="auto">{t('room.auto_detect', lang)}</option>
                         {languageOptions.map(l => <option key={`p-${l.code}`} value={l.code}>{plainLanguageName(l.name)}</option>)}
                       </LanguageField>
+                    )}
+                    {(languageDirty || languageSaved) && (
+                      <div className="px-4 pb-4 pt-1">
+                        <button type="button" onClick={saveLanguages} disabled={!languageDirty} className={primaryButton}>
+                          <Check className="w-[18px] h-[18px]" />
+                          {t(languageDirty ? 'common.save' : 'common.saved', lang)}
+                        </button>
+                      </div>
                     )}
                   </SettingsGroup>
 

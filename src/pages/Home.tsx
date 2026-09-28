@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Heart, Link as LinkIcon, Languages, User, Camera, Sun, Moon, UserRound } from 'lucide-react';
+import { Heart, Link as LinkIcon, Languages, User, Camera, Sun, Moon, UserRound, Check } from 'lucide-react';
 import { useStore, Gender } from '../store/useStore';
 import { t } from '../lib/i18n';
 import { cn, compressImage } from '../lib/utils';
@@ -87,6 +87,8 @@ export default function Home() {
 
   // Rooms need a signed-in user; ask first, then continue where they were heading
   const goSignedIn = (path: string, reason: string) => {
+    // An unsaved name is kept when the user heads into a room
+    if (name.trim() && nameDirty) setProfile({ name: name.trim() });
     if (authUser) return navigate(path);
     setPendingPath(path);
     openAccount(reason);
@@ -116,8 +118,14 @@ export default function Home() {
 
   const getAvatarImage = () => profile.avatarUrl || null;
 
-  const handleSaveProfile = () => {
-    setProfile({ name: name.trim(), gender });
+  const [nameSaved, setNameSaved] = useState(false);
+  const nameDirty = name.trim() !== (profile.name || '');
+  const handleSaveName = () => {
+    if (!name.trim()) return;
+    setName(name.trim());
+    setProfile({ name: name.trim() });
+    setNameSaved(true);
+    setTimeout(() => setNameSaved(false), 2000);
   };
 
   // Gender is optional (the label says so); a name is all we need to start
@@ -211,21 +219,35 @@ export default function Home() {
 
         {/* Profile fields */}
         <div className="space-y-3">
-          <label className="block">
-            <span className="sr-only">{t('profile.name_label', profile.language)}</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setProfile({ name: e.target.value.trim() });
-              }}
-              onBlur={handleSaveProfile}
-              placeholder={t('home.name_placeholder', profile.language)}
-              maxLength={32}
-              className="w-full px-5 py-3.5 rounded-full border-2 border-(--theme-border) bg-(--theme-card-bg) text-(--theme-ink) placeholder:text-(--theme-muted) text-base font-semibold text-center focus:outline-none focus:border-(--theme-accent) transition-colors"
-            />
-          </label>
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveName();
+            }}
+          >
+            <label className="block flex-1 min-w-0">
+              <span className="sr-only">{t('profile.name_label', profile.language)}</span>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('home.name_placeholder', profile.language)}
+                maxLength={32}
+                className="w-full px-5 py-3.5 rounded-full border-2 border-(--theme-border) bg-(--theme-card-bg) text-(--theme-ink) placeholder:text-(--theme-muted) text-base font-semibold text-center focus:outline-none focus:border-(--theme-accent) transition-colors"
+              />
+            </label>
+            {((nameDirty && name.trim()) || nameSaved) && (
+              <button
+                type="submit"
+                disabled={!nameDirty}
+                className="shrink-0 h-[54px] px-5 rounded-full bg-(--theme-accent) text-(--theme-on-accent) font-bold text-[15px] flex items-center gap-1.5 hover:bg-(--theme-accent-hover) transition-colors active:scale-[0.98] disabled:opacity-70 cursor-pointer"
+              >
+                <Check className="w-[18px] h-[18px]" />
+                {t(nameDirty ? 'common.save' : 'common.saved', profile.language)}
+              </button>
+            )}
+          </form>
 
           <div className="flex items-center justify-center gap-2" role="group" aria-label={t('profile.gender_label', profile.language)}>
             {(['female', 'male'] as Gender[]).map((g) => {

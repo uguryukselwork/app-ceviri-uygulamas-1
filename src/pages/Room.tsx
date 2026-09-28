@@ -53,11 +53,18 @@ export default function Room() {
 
   useEffect(() => {
     scrollToBottom();
+  }, [messages]);
 
-    // Mark the partner's messages as read while the room is open
-    if (roomId && messages.some(m => m.sender_id !== profile.id && !m.is_read)) {
-      void markMessagesRead(roomId, profile.id);
-    }
+  // Mark the partner's messages as seen while the room is on screen, and again when the app comes back to the front
+  useEffect(() => {
+    const markSeen = () => {
+      if (roomId && document.visibilityState === 'visible' && messages.some(m => m.sender_id !== profile.id && !m.is_read)) {
+        void markMessagesRead(roomId, profile.id);
+      }
+    };
+    markSeen();
+    document.addEventListener('visibilitychange', markSeen);
+    return () => document.removeEventListener('visibilitychange', markSeen);
   }, [messages, roomId, profile.id]);
 
   // Latest notification preferences, read inside the realtime callback without resubscribing
@@ -413,8 +420,9 @@ export default function Room() {
                             </button>
                           )}
                           {isEditing ? (
-                            <button type="button" onClick={saveName} aria-label="Adı kaydet" className={cn(rowButton, 'text-(--theme-accent) hover:bg-(--theme-accent-light)')}>
+                            <button type="button" onClick={saveName} className="h-9 px-3.5 rounded-full bg-(--theme-accent) text-(--theme-on-accent) text-[13px] font-bold flex items-center gap-1 hover:bg-(--theme-accent-hover) transition-colors cursor-pointer">
                               <Check className="w-4 h-4" />
+                              {t('common.save', profile.language)}
                             </button>
                           ) : (
                             <button

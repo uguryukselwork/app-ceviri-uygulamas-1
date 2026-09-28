@@ -190,10 +190,13 @@ export default function ChatMessage({ message, showOriginal, onRetry, isFirstInG
             <span>
               {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
-            {isMe && !isTranslating && (
-              message.is_read
-                ? <CheckCheck className="w-3.5 h-3.5" aria-label="Okundu" />
-                : <Check className="w-3.5 h-3.5 opacity-70" aria-label="Gönderildi" />
+            {isMe && (
+              <span className={cn("flex items-center gap-0.5 font-bold", !message.is_read && "opacity-75")}>
+                {message.is_read
+                  ? <CheckCheck className="w-3.5 h-3.5" aria-hidden />
+                  : <Check className="w-3.5 h-3.5" aria-hidden />}
+                {t(message.is_read ? 'msg.seen' : 'msg.delivered', lang)}
+              </span>
             )}
           </div>
         </div>

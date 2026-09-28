@@ -47,6 +47,8 @@ interface AppState {
   setSoundEnabled: (enabled: boolean) => void;
   notificationSound: string;
   setNotificationSound: (sound: string) => void;
+  soundVolume: number;
+  setSoundVolume: (volume: number) => void;
   deferredPrompt: any;
   setDeferredPrompt: (prompt: any) => void;
   fontSize: 'small' | 'medium' | 'large';
@@ -221,6 +223,7 @@ export const useStore = create<AppState>()(
         chatPattern: state.chatPattern,
         soundEnabled: state.soundEnabled,
         notificationSound: state.notificationSound,
+        soundVolume: state.soundVolume,
         fontSize: state.fontSize,
         fontFamily: state.fontFamily,
         isPremium: state.isPremium,
