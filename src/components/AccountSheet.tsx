@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Download, Loader2, LogOut, Settings as SettingsIcon, UserRound } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { signInWithGoogle, signInAsGuest, signOut, isGuest } from '../lib/auth';
+import { signInWithGoogle, signInAsGuest, signOut, isGuest, isGoogleSignInEnabled } from '../lib/auth';
 import { SettingsGroup, SettingsRow, primaryButton, focusRing, softIconButton } from './ui';
 import InstallGuide, { isInstalledApp } from './InstallGuide';
 import { cn } from '../lib/utils';
@@ -18,19 +18,19 @@ function GoogleLogo() {
   );
 }
 
-/** Google sign-in is shown but not wired up yet; flip this once the provider is configured in Supabase. */
-const GOOGLE_SIGN_IN_ENABLED = false;
-
 /** The two sign-in choices. Used in the account sheet and on the full-page sign-in screen. */
 export function SignInOptions({ onSignedIn }: { onSignedIn?: () => void }) {
   const [busy, setBusy] = useState<'google' | 'guest' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Shown as "coming soon" until Google is switched on in Supabase
+  const [googleReady, setGoogleReady] = useState(false);
+  useEffect(() => { isGoogleSignInEnabled().then(setGoogleReady); }, []);
 
   const run = async (kind: 'google' | 'guest') => {
     setError(null);
     setNotice(null);
-    if (kind === 'google' && !GOOGLE_SIGN_IN_ENABLED) {
+    if (kind === 'google' && !googleReady) {
       setNotice('Google ile giriş yakında geliyor. Şimdilik misafir olarak devam edebilirsin.');
       return;
     }
@@ -62,16 +62,16 @@ export function SignInOptions({ onSignedIn }: { onSignedIn?: () => void }) {
         type="button"
         onClick={() => run('google')}
         disabled={!!busy}
-        aria-describedby={GOOGLE_SIGN_IN_ENABLED ? undefined : 'google-soon'}
+        aria-describedby={googleReady ? undefined : 'google-soon'}
         className={cn(
           'w-full py-4 px-5 rounded-[1.75rem] bg-white text-[#1f1f1f] border-2 border-(--theme-border) font-bold text-[15px] flex items-center justify-center gap-3 hover:bg-neutral-50 transition-colors active:scale-[0.98] disabled:opacity-60 cursor-pointer',
-          !GOOGLE_SIGN_IN_ENABLED && 'opacity-70',
+          !googleReady && 'opacity-70',
           focusRing
         )}
       >
         {busy === 'google' ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleLogo />}
         Google ile giriş yap
-        {!GOOGLE_SIGN_IN_ENABLED && (
+        {!googleReady && (
           <span id="google-soon" className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-neutral-500">
             Yakında
           </span>
@@ -169,7 +169,7 @@ export default function AccountSheet({ open, onClose, onOpenSettings, reason }: 
 
                 {guest && (
                   <p className="rounded-3xl bg-(--theme-accent-light) px-4 py-3.5 text-sm text-(--theme-ink)">
-                    Misafir hesabın sadece bu cihazda duruyor. Google ile giriş yakında gelecek; o zaman odalarını başka cihazlarda da görebileceksin.
+                    Misafir hesabın sadece bu cihazda duruyor. Odalarını başka cihazlarda da görmek istersen Google ile giriş yap. Misafir hesaptaki odalar yeni hesaba taşınmaz.
                   </p>
                 )}
 
