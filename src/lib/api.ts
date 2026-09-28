@@ -96,7 +96,14 @@ export async function sendMessage(msg: {
   original_language: string;
   target_language: string;
 }): Promise<MessageType> {
-  const { data, error } = await supabase.from('messages').insert(msg).select('*').single();
+  // Clamp target language to supported codes; fallback to opposite of source if unsupported
+  const supported = ['tr', 'en', 'de', 'fr', 'es', 'it', 'ru', 'ar', 'ja', 'ko', 'th', 'tk'];
+  let targetLang = msg.target_language;
+  if (!supported.includes(targetLang)) {
+    // default to opposite of source if source is tr/en, else default to en
+    targetLang = msg.original_language === 'tr' ? 'en' : 'tr';
+  }
+  const { data, error } = await supabase.from('messages').insert({ ...msg, target_language: targetLang }).select('*').single();
   if (error) throw error;
   void requestTranslation(data.id);
   return data as MessageType;
