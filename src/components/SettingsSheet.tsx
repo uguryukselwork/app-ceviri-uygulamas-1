@@ -61,6 +61,7 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
     notificationSound, setNotificationSound, colorTheme, fontSize, fontFamily,
     isPremium, hideProfile, setHideProfile, vibrationEnabled, setVibrationEnabled,
     deferredPrompt, setDeferredPrompt,
+    soundVolume, setSoundVolume
   } = useStore();
   const [view, setView] = useState<'main' | 'theme' | 'typography'>('main');
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -199,29 +200,46 @@ export default function SettingsSheet({ open, onClose, room }: SettingsSheetProp
                       title="Bildirim sesi"
                       trailing={<Toggle label="Bildirim sesi" checked={soundEnabled} onChange={setSoundEnabled} />}
                     />
-                    {soundEnabled && (
-                      <div className="px-4 py-3.5 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[15px] font-bold text-(--theme-ink)">Melodi</span>
-                          <button
-                            type="button"
-                            onClick={() => playNotificationSound(notificationSound)}
-                            className={cn('flex items-center gap-1.5 px-3 py-1.5 -my-1 rounded-full text-[13px] font-bold text-(--theme-accent) hover:bg-(--theme-accent-light) transition-colors cursor-pointer', focusRing)}
-                          >
-                            <Play className="w-3 h-3 fill-current" /> Dinle
-                          </button>
-                        </div>
+                    <div className="px-4 py-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[15px] font-bold text-(--theme-ink)">Melodi</span>
+                        <button
+                          type="button"
+                          onClick={() => playNotificationSound(notificationSound, soundVolume)}
+                          className={cn('flex items-center gap-1.5 px-3 py-1.5 -my-1 rounded-full text-[13px] font-bold text-(--theme-accent) hover:bg-(--theme-accent-light) transition-colors cursor-pointer', focusRing)}
+                        >
+                          <Play className="w-3 h-3 fill-current" /> Dinle
+                        </button>
+                      </div>
+                      <div className="space-y-2">
                         <Segmented
                           label="Melodi"
                           options={SOUNDS}
                           value={notificationSound}
                           onChange={(id) => {
                             setNotificationSound(id);
-                            playNotificationSound(id);
+                            playNotificationSound(id, soundVolume);
                           }}
                         />
+                        <div className="flex items-center gap-3">
+                          <span className="text-[13px] font-bold text-(--theme-ink)">Ses seviyesi</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={soundVolume}
+                            onChange={(e) => {
+                              const vol = parseFloat(e.target.value);
+                              setSoundVolume(vol);
+                              // Play a preview sound at the selected volume
+                              playNotificationSound(notificationSound, vol);
+                            }}
+                            className="w-24"
+                          />
+                        </div>
                       </div>
-                    )}
+                    </div>
                     <SettingsRow
                       icon={<Smartphone className="w-[18px] h-[18px]" />}
                       title="Titreşim"

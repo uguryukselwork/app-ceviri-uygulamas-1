@@ -14,12 +14,12 @@ export const generateRoomCode = () => {
   return result;
 };
 
-export const playNotificationSound = (type: string = 'pop') => {
+export const playNotificationSound = (type: string = 'pop', volume: number = 0.5) => {
   try {
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
-    
+
     // Browser audio policy might require resuming the context
     if (ctx.state === 'suspended') {
       ctx.resume();
@@ -35,8 +35,8 @@ export const playNotificationSound = (type: string = 'pop') => {
       osc.frequency.setValueAtTime(600, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.12);
       gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      gain.gain.linearRampToValueAtTime(0.4 * volume, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001 * volume, ctx.currentTime + 0.12);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.12);
     } else if (type === 'chime') {
@@ -49,8 +49,8 @@ export const playNotificationSound = (type: string = 'pop') => {
         o.type = 'triangle';
         o.frequency.setValueAtTime(freq, start);
         g.gain.setValueAtTime(0, start);
-        g.gain.linearRampToValueAtTime(0.3, start + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+        g.gain.linearRampToValueAtTime(0.3 * volume, start + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001 * volume, start + dur);
         o.start(start);
         o.stop(start + dur);
       };
@@ -65,8 +65,8 @@ export const playNotificationSound = (type: string = 'pop') => {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(1174.66, ctx.currentTime); // D6
       gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      gain.gain.linearRampToValueAtTime(0.25 * volume, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001 * volume, ctx.currentTime + 0.6);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.6);
     } else if (type === 'digital') {
@@ -79,8 +79,8 @@ export const playNotificationSound = (type: string = 'pop') => {
         o.type = 'sine';
         o.frequency.setValueAtTime(freq, start);
         g.gain.setValueAtTime(0, start);
-        g.gain.linearRampToValueAtTime(0.25, start + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.001, start + 0.07);
+        g.gain.linearRampToValueAtTime(0.25 * volume, start + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.001 * volume, start + 0.07);
         o.start(start);
         o.stop(start + 0.07);
       };
@@ -91,8 +91,8 @@ export const playNotificationSound = (type: string = 'pop') => {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 note
       gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      gain.gain.linearRampToValueAtTime(0.5 * volume, ctx.currentTime + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.01 * volume, ctx.currentTime + 0.3);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.3);
     }
