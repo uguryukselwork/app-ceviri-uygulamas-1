@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="128" fill="#4F46E5"/>
-  <path d="M140 180h140M210 140v40m-50 0c0 55 35 105 80 130m-60-70c20 30 50 55 90 70" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M280 370l70-160 70 160m-20-45h-100" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0647d"/><stop offset="1" stop-color="#b5364f"/></linearGradient></defs><rect width="512" height="512" rx="116" fill="url(#g)"/><g transform="translate(256 256) scale(1) translate(-256 -256)">
+  <path d="M96 118 h184 a44 44 0 0 1 44 44 v96 a44 44 0 0 1 -44 44 h-104 l-52 44 v-44 h-28 a44 44 0 0 1 -44 -44 v-96 a44 44 0 0 1 44 -44z" fill="#fce3e6"/>
+  <text x="188" y="244" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="118" fill="#c8435f">A</text>
+  <path d="M232 214 h184 a44 44 0 0 1 44 44 v96 a44 44 0 0 1 -44 44 h-28 v44 l-52 -44 h-104 a44 44 0 0 1 -44 -44 v-96 a44 44 0 0 1 44 -44z" fill="#ffffff"/>
+  <text x="324" y="345" text-anchor="middle" font-family="Microsoft YaHei, Yu Gothic, Malgun Gothic, sans-serif" font-weight="700" font-size="112" fill="#c8435f">文</text>
+</g></svg>

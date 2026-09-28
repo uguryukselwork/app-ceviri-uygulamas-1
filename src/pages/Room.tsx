@@ -257,6 +257,7 @@ export default function Room() {
             onRetry={handleRetryTranslation}
             isFirstInGroup={messages[i - 1]?.sender_id !== msg.sender_id}
             isLastInGroup={messages[i + 1]?.sender_id !== msg.sender_id}
+            avatarUrl={participants.find(p => p.user_id === msg.sender_id)?.avatarUrl}
           />
         ))}
         <div ref={messagesEndRef} className="h-4 shrink-0" />

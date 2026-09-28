@@ -30,6 +30,8 @@ interface ChatMessageProps {
   isFirstInGroup?: boolean;
   /** Last message in a run from the same sender: shows the avatar and the bubble tail */
   isLastInGroup?: boolean;
+  /** The sender's current photo from the room's participant list; falls back to the one saved with the message */
+  avatarUrl?: string | null;
 }
 
 // Language name for a code ("English"), or null when unknown / auto-detected
@@ -37,6 +39,14 @@ const languageLabel = (code?: string | null) => {
   const found = LANGUAGES.find(l => l.code === code && l.code !== 'auto');
   return found ? plainLanguageName(found.name) : null;
 };
+
+function Avatar({ url, name, lang }: { url?: string | null; name?: string; lang: string }) {
+  return (
+    <div className="w-8 h-8 rounded-full bg-(--theme-accent-light) text-(--theme-accent) flex items-center justify-center shrink-0 overflow-hidden font-display font-semibold text-sm">
+      {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : (name || '?')[0].toLocaleUpperCase(lang)}
+    </div>
+  );
+}
 
 function TranslatingDots({ label }: { label: string }) {
   return (
@@ -49,11 +59,19 @@ function TranslatingDots({ label }: { label: string }) {
   );
 }
 
-export default function ChatMessage({ message, showOriginal, onRetry, isFirstInGroup = true, isLastInGroup = true }: ChatMessageProps) {
+export default function ChatMessage({ message, showOriginal, onRetry, isFirstInGroup = true, isLastInGroup = true, avatarUrl }: ChatMessageProps) {
   const profile = useStore((state) => state.profile);
   const colorTheme = useStore((state) => state.colorTheme);
   const bubbleColor = useStore((state) => state.bubbleColor);
+  const hideProfile = useStore((state) => state.hideProfile);
   const isMe = message.sender_id === profile.id;
+  const senderAvatar = isMe
+    ? (hideProfile ? null : profile.avatarUrl)
+    : (avatarUrl ?? message.sender_avatar);
+  // Avatar on the last bubble of each run, on both sides; a spacer keeps earlier bubbles aligned
+  const avatarSlot = isLastInGroup
+    ? <Avatar url={senderAvatar} name={isMe ? profile.name : message.sender_name} lang={profile.language} />
+    : <div className="w-8 shrink-0" aria-hidden />;
   const isTranslating = message.translation_status === 'pending';
   const isError = message.translation_status === 'error';
   const lang = profile.language;
@@ -91,21 +109,9 @@ export default function ChatMessage({ message, showOriginal, onRetry, isFirstInG
         isLastInGroup ? "mb-3" : "mb-0.5"
       )}
     >
-      {!isMe && (
-        isLastInGroup ? (
-          <div className="w-8 h-8 rounded-full bg-(--theme-accent-light) text-(--theme-accent) flex items-center justify-center shrink-0 overflow-hidden font-display font-semibold text-sm">
-            {message.sender_avatar ? (
-              <img src={message.sender_avatar} alt="" className="w-full h-full object-cover" />
-            ) : (
-              (message.sender_name || '?')[0].toLocaleUpperCase(lang)
-            )}
-          </div>
-        ) : (
-          <div className="w-8 shrink-0" aria-hidden />
-        )
-      )}
+      {!isMe && avatarSlot}
 
-      <div className={cn("max-w-[80%] flex flex-col min-w-0", isMe ? "items-end" : "items-start")}>
+      <div className={cn("max-w-[75%] flex flex-col min-w-0", isMe ? "items-end" : "items-start")}>
         {!isMe && isFirstInGroup && (
           <span className="text-xs font-bold text-(--theme-muted) ml-3 mb-1">
             {message.sender_name}
@@ -113,7 +119,7 @@ export default function ChatMessage({ message, showOriginal, onRetry, isFirstInG
         )}
 
         <div className={cn(
-          "px-4 pt-2.5 pb-2 rounded-[1.4rem] min-w-[5.5rem]",
+          "px-4 pt-2.5 pb-2 rounded-[1.4rem] min-w-[5.5rem] max-w-full",
           isMe
             ? cn(getBubbleClass(bubbleColor, colorTheme), isLastInGroup && "rounded-br-md")
             : cn("bg-(--theme-card-bg) text-(--theme-ink) border border-(--theme-border)", isLastInGroup && "rounded-bl-md")
@@ -121,7 +127,7 @@ export default function ChatMessage({ message, showOriginal, onRetry, isFirstInG
           {!isMe && isTranslating ? (
             <TranslatingDots label={t('msg.translating', lang)} />
           ) : (
-            <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">{mainText}</p>
+            <p className="text-[15px] leading-snug whitespace-pre-wrap [overflow-wrap:anywhere]">{mainText}</p>
           )}
 
           {isMe && isTranslating && (
@@ -138,7 +144,7 @@ export default function ChatMessage({ message, showOriginal, onRetry, isFirstInG
               <div className={cn("text-[11px] font-bold mb-0.5", isMe ? "opacity-75" : "text-(--theme-muted)")}>
                 {languageLabel(panelLanguage) ?? (isMe ? t('msg.translated', lang) : '')}
               </div>
-              <p className={cn("text-[14px] leading-snug whitespace-pre-wrap break-words", !isMe && "text-(--theme-muted)")}>
+              <p className={cn("text-[14px] leading-snug whitespace-pre-wrap [overflow-wrap:anywhere]", !isMe && "text-(--theme-muted)")}>
                 {panelText}
               </p>
             </div>
@@ -192,6 +198,8 @@ export default function ChatMessage({ message, showOriginal, onRetry, isFirstInG
           </div>
         </div>
       </div>
+
+      {isMe && avatarSlot}
     </motion.div>
   );
 }
