@@ -10,6 +10,7 @@ import { useStore } from './store/useStore';
 import SecurityLockModal from './components/SecurityLockModal';
 import { SignInOptions } from './components/AccountSheet';
 import { useAuthSync } from './lib/auth';
+import { fetchVipStatus, subscribeToMembership } from './lib/api';
 import { Languages, Loader2 } from 'lucide-react';
 
 /** Room pages need a Supabase session; a shared room link lands here first when signed out */
@@ -42,8 +43,33 @@ function RequireAuth({ children }: { children: React.ReactElement }) {
   );
 }
 
+/** VIP settings (hidden profile, VIP badge) need an active paid package; the local switch follows the server */
+function useMembershipSync() {
+  const userId = useStore((s) => s.authUser?.id);
+  const setIsPremium = useStore((s) => s.setIsPremium);
+  const setHideProfile = useStore((s) => s.setHideProfile);
+
+  React.useEffect(() => {
+    if (!userId) {
+      setIsPremium(false);
+      return;
+    }
+    const sync = () => fetchVipStatus(userId).then((status) => {
+      const active = !!status.vipUntil;
+      setIsPremium(active);
+      if (!active) setHideProfile(false);
+    }).catch(() => {});
+    void sync();
+    const unsubscribe = subscribeToMembership(userId, () => { void sync(); });
+    // A package can run out while the app stays open
+    const timer = setInterval(sync, 5 * 60 * 1000);
+    return () => { unsubscribe(); clearInterval(timer); };
+  }, [userId, setIsPremium, setHideProfile]);
+}
+
 export default function App() {
   useAuthSync();
+  useMembershipSync();
   const theme = useStore((state) => state.theme);
   const colorTheme = useStore((state) => state.colorTheme);
   const fontSize = useStore((state) => state.fontSize);

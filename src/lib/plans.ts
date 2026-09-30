@@ -31,6 +31,7 @@ export const PACKAGES: Package[] = [
     basePrices: { weekly: 0, monthly: 0, yearly: 0 },
     features: [
       'Tarayıcının kendi sesli çevirisi (1–2 sn gecikmeli)',
+      'Sesli yazma: konuş, mesajın yazılsın',
       'Sınırsız yazılı çeviri',
       'Yazıyor göstergesi, yanıtlama, okundu bilgisi',
     ],

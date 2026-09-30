@@ -264,7 +264,7 @@ export default function Plans() {
               <div className="font-display font-semibold text-lg text-(--theme-ink)">Ücretsiz</div>
               <div className="text-[13px] text-(--theme-muted) mb-3">Her zaman ücretsiz</div>
               <ul className="space-y-2">
-                {['Tarayıcının kendi sesli çevirisi (1–2 sn gecikmeli)', 'Sınırsız yazılı çeviri', 'Yazıyor göstergesi, yanıtlama, okundu bilgisi'].map(f => (
+                {['Tarayıcının kendi sesli çevirisi (1–2 sn gecikmeli)', 'Sesli yazma: konuş, mesajın yazılsın', 'Sınırsız yazılı çeviri', 'Yazıyor göstergesi, yanıtlama, okundu bilgisi'].map(f => (
                   <li key={f} className="flex items-start gap-2 text-[14px] text-(--theme-ink)">
                     <Check className="w-4 h-4 mt-0.5 shrink-0 text-(--theme-muted)" /> {f}
                   </li>

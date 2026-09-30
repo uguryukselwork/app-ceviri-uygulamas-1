@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Crown, Sparkles, EyeOff, Zap, Check, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -19,19 +20,14 @@ const FEATURES = [
 ];
 
 export default function PremiumModal({ isOpen, onClose, onSuccess, featureTitle }: PremiumModalProps) {
-  const { isPremium, setIsPremium } = useStore();
-  const [celebrating, setCelebrating] = useState(false);
+  const isPremium = useStore((s) => s.isPremium);
+  const navigate = useNavigate();
 
   if (!isOpen) return null;
 
-  const handleActivate = () => {
-    setIsPremium(true);
-    setCelebrating(true);
-    setTimeout(() => {
-      setCelebrating(false);
-      if (onSuccess) onSuccess();
-      onClose();
-    }, 1200);
+  const openPlans = () => {
+    onClose();
+    navigate('/plans');
   };
 
   return (
@@ -91,19 +87,18 @@ export default function PremiumModal({ isOpen, onClose, onSuccess, featureTitle 
                 </p>
                 <button
                   type="button"
-                  onClick={() => setIsPremium(false)}
-                  className={cn('w-full py-2 rounded-full text-[13px] font-bold text-(--theme-muted) hover:text-red-600 transition-colors cursor-pointer', focusRing)}
+                  onClick={openPlans}
+                  className={cn('w-full py-2 rounded-full text-[13px] font-bold text-(--theme-muted) hover:text-(--theme-accent) transition-colors cursor-pointer', focusRing)}
                 >
-                  VIP üyeliği bitir (test modu)
+                  Paketimi gör
                 </button>
               </>
             ) : (
               <>
-                <button type="button" onClick={handleActivate} disabled={celebrating} className={primaryButton}>
-                  {celebrating ? <Check className="w-[18px] h-[18px]" /> : <Crown className="w-[18px] h-[18px]" />}
-                  {celebrating ? 'VIP açıldı' : "VIP'i ücretsiz aç"}
+                <button type="button" onClick={openPlans} className={primaryButton}>
+                  <Crown className="w-[18px] h-[18px]" /> VIP paket seç
                 </button>
-                <p className="text-center text-xs text-(--theme-muted)">Deneme sürümü, kart bilgisi gerekmez.</p>
+                <p className="text-center text-xs text-(--theme-muted)">Bu özellikler aktif bir Standart ya da Premium paketle açılır.</p>
               </>
             )}
           </div>

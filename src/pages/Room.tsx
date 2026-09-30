@@ -602,6 +602,7 @@ export default function Room() {
         } : null}
         onCancelReply={() => setReplyTo(null)}
         onTyping={(typing) => liveRef.current?.setTyping(typing)}
+        micBusy={inCall}
       />
 
       {/* Settings Overlay */}

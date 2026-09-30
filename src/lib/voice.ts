@@ -523,6 +523,78 @@ export class BrowserVoiceTranslator implements VoiceEngine {
   }
 }
 
+export const isDictationSupported = () => typeof window !== 'undefined' && !!recognitionCtor();
+
+/**
+ * Voice typing ("sesli yazma") for the message field: listens in my language until stopped.
+ * onText gets the finished text so far plus what is being said right now.
+ */
+export class Dictation {
+  private rec: Recognition | null = null;
+  private finalText = '';
+  private active = false;
+
+  constructor(private opts: {
+    language: string;
+    onText: (finalText: string, interim: string) => void;
+    onEnd: (error?: string) => void;
+  }) {}
+
+  start() {
+    const Ctor = recognitionCtor();
+    if (!Ctor) return this.opts.onEnd('Bu tarayıcı sesli yazmayı desteklemiyor');
+    this.active = true;
+    const rec = new Ctor();
+    rec.lang = speechLocale(this.opts.language);
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    const handled = new Set<number>();
+    rec.onstart = () => handled.clear();
+    rec.onresult = (e) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (handled.has(i)) continue;
+        const text = collapseRepeats(e.results[i][0].transcript);
+        if (!text) continue;
+        if (e.results[i].isFinal) {
+          handled.add(i);
+          // Android repeats a finished phrase; keep it once
+          if (!this.finalText.toLocaleLowerCase().endsWith(text.toLocaleLowerCase())) {
+            this.finalText = (this.finalText ? this.finalText + ' ' : '') + text;
+          }
+        } else {
+          interim += (interim ? ' ' : '') + text;
+        }
+      }
+      this.opts.onText(this.finalText, interim);
+    };
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') this.finish('Mikrofon izni verilmedi');
+      else if (e.error === 'language-not-supported') this.finish('Bu dil tarayıcıda tanınmıyor');
+    };
+    // Phones stop after a pause; keep listening until the user taps stop
+    rec.onend = () => {
+      if (!this.active) return;
+      setTimeout(() => { if (this.active) { try { rec.start(); } catch { this.finish(); } } }, 200);
+    };
+    this.rec = rec;
+    try { rec.start(); } catch { this.finish('Sesli yazma başlatılamadı'); }
+  }
+
+  private finish(error?: string) {
+    if (!this.active) return;
+    this.active = false;
+    try { this.rec?.abort(); } catch { /* already stopped */ }
+    this.rec = null;
+    this.opts.onEnd(error);
+  }
+
+  stop() {
+    this.finish();
+  }
+}
+
 /** iOS only speaks after speech was started inside a tap; call from the tap that joins the call */
 export function unlockSpeech() {
   try {
