@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, Check, Gift, Loader2, PartyPopper, Clock, Sparkles, Ticket, Send } from 'lucide-react';
+import { Crown, Check, Gift, Loader2, PartyPopper, Clock, Sparkles, Ticket, Send, Sun, Moon, DollarSign, Zap } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { SheetHeader, Segmented, fieldClass, primaryButton, secondaryButton } from '../components/ui';
@@ -28,8 +28,9 @@ export default function Plans() {
   const [status, setStatus] = useState<VipStatus | null>(null);
   const [request, setRequest] = useState<VipRequest | null>(null);
   const [period, setPeriod] = useState<Period>('monthly');
-  const [giftOpen, setGiftOpen] = useState(false);
-  const [code, setCode] = useState('');
+  const [switchCount, setSwitchCount] = useState(0);
+  const [dailyEnabled, setDailyEnabled] = useState(false);
+  const [hourlyEnabled, setHourlyEnabled] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [celebrate, setCelebrate] = useState(false);
@@ -52,6 +53,11 @@ export default function Plans() {
     document.addEventListener('visibilitychange', onVisible);
     return () => { unsubscribe(); document.removeEventListener('visibilitychange', onVisible); };
   }, [profile.id]);
+
+  useEffect(() => {
+    // Increment switch count when period changes
+    setSwitchCount(prev => prev + 1);
+  }, [period]);
 
   const redeem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,66 +169,59 @@ export default function Plans() {
             )}
           </AnimatePresence>
 
-          {/* Gift / promo code */}
+          {/* Usage rights */}
           <div className="rounded-[1.75rem] border-2 border-dashed border-(--theme-accent) bg-(--theme-accent-light) overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setGiftOpen(o => !o)}
-              aria-expanded={giftOpen}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer"
-            >
-              <span className="w-10 h-10 shrink-0 rounded-2xl bg-(--theme-accent) text-(--theme-on-accent) flex items-center justify-center">
-                <Gift className="w-5 h-5" />
-              </span>
-              <span className="flex-1 min-w-0">
-                <span className="block font-bold text-[15px] text-(--theme-ink)">Hediyemiz var 🎁</span>
-                <span className="block text-[13px] text-(--theme-muted)">Promosyon kodu gir ya da VIP'i ücretsiz dene</span>
-              </span>
-            </button>
-            <AnimatePresence initial={false}>
-              {giftOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="px-4 pb-4 space-y-3"
-                >
-                  <form onSubmit={redeem} className="flex gap-2">
-                    <div className="relative flex-1 min-w-0">
-                      <Ticket className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-(--theme-muted)" aria-hidden />
-                      <input
-                        type="text"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))}
-                        placeholder="PROMOSYON KODU"
-                        aria-label="Promosyon kodu"
-                        autoCapitalize="characters"
-                        className={cn(fieldClass, 'pl-10 font-display tracking-[0.12em]')}
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={!code.trim() || !!busy}
-                      className="shrink-0 px-4 rounded-2xl bg-(--theme-accent) text-(--theme-on-accent) font-bold text-sm disabled:opacity-45 cursor-pointer flex items-center gap-1.5"
-                    >
-                      {busy === 'code' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Kodu kullan'}
-                    </button>
-                  </form>
-                  <div className="flex items-center gap-3 text-[12px] font-bold text-(--theme-muted)">
-                    <span className="flex-1 h-px bg-(--theme-border)" /> ya da <span className="flex-1 h-px bg-(--theme-border)" />
-                  </div>
+            <div className="px-4 py-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="block font-bold text-[15px] text-(--theme-ink)">Kullanım hakkı</span>
+                <div className="flex items-center gap-2 text-[13px] text-(--theme-muted)">
                   <button
                     type="button"
-                    disabled={!!busy || !!pending}
-                    onClick={() => sendRequest('gift', null)}
-                    className={cn(secondaryButton, 'py-3 bg-(--theme-card-bg)')}
+                    onClick={() => setDailyEnabled(!dailyEnabled)}
+                    className={cn(
+                      dailyEnabled
+                        ? 'bg-(--theme-accent) text-(--theme-on-accent)'
+                        : 'bg-(--theme-card-bg) text-(--theme-ink)'
+                    )}
+                    className="px-3 py-1 rounded-full text-sm font-medium"
                   >
-                    {busy === 'gift' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    {pending?.kind === 'gift' ? 'İsteğin gönderildi, onay bekleniyor' : 'Ücretsiz dene — yöneticiye istek gönder'}
+                    Günlük
                   </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <button
+                    type="button"
+                    onClick={() => setHourlyEnabled(!hourlyEnabled)}
+                    className={cn(
+                      hourlyEnabled
+                        ? 'bg-(--theme-accent) text-(--theme-on-accent)'
+                        : 'bg-(--theme-card-bg) text-(--theme-ink)'
+                    )}
+                    className="px-3 py-1 rounded-full text-sm font-medium"
+                  >
+                    Saatlik
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                {[5, 10, 20].map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => {
+                      // TODO: implement sending dollar to account
+                      alert(`${amount}$ gönderildi (henüz entegrasyon yok)`);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-[1.25rem] border border-(--theme-accent) bg-(--theme-card-bg) text-(--theme-ink) text-sm"
+                  >
+                    <DollarSign className="w-4 h-4" /> {amount}$
+                  </button>
+                ))}
+              </div>
+
+              <div className="text-[12px] text-(--theme-muted)">
+                Günlük ve saatlik seçenekleri VIP üyelik dışında kullanılabilecek ücretsiz haklar.
+              </div>
+            </div>
           </div>
 
           {notice && (
@@ -276,7 +275,7 @@ export default function Plans() {
                       <div className="text-[13px] text-(--theme-muted)">{pkg.tagline}</div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-display font-semibold text-2xl text-(--theme-ink)">{formatUsd(pkg.prices[period])}</div>
+                      <div className="font-display font-semibold text-2xl text-(--theme-ink)">{formatUsd(pkg.basePrices[period] + switchCount)}</div>
                       <div className="text-[12px] font-semibold text-(--theme-muted)">/ {unit}</div>
                     </div>
                   </div>
