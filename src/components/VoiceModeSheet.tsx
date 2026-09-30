@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import { primaryButton } from './ui';
 import type { VipStatus } from '../lib/api';
 import type { VoiceMode } from '../lib/voice';
+import { formatTalkTime } from '../lib/plans';
 
 interface VoiceModeSheetProps {
   open: boolean;
@@ -101,7 +102,9 @@ export default function VoiceModeSheet({ open, status, onClose, onStart, onOpenP
                 'VIP üyelik', 'VIP',
                 vipOff ? 'VIP sesli çeviri şu an kapalı.'
                 : status?.access === 'everyone' ? 'Gemini canlı ses: akıcı, gerçek görüşme gibi. Şu an herkese ücretsiz!'
-                : 'Gemini canlı ses: akıcı, gerçek görüşme gibi.',
+                : status && !status.vipUntil && status.vipSeconds > 0
+                  ? `Gemini canlı ses. Kalan konuşma hakkın: ${formatTalkTime(status.vipSeconds)}`
+                  : 'Gemini canlı ses: akıcı, gerçek görüşme gibi.',
                 !status || vipLocked
               )}
             </div>

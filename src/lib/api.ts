@@ -126,18 +126,21 @@ export interface VipStatus {
   canUseVip: boolean;
   /** Account balance in US dollars, topped up by the admin */
   balanceUsd: number;
+  /** VIP talk time left in seconds, sent by the admin; runs down during VIP calls */
+  vipSeconds: number;
 }
 
 export async function fetchVipStatus(userId: string): Promise<VipStatus> {
   const [{ data: setting }, { data: membership }] = await Promise.all([
     supabase.from('app_settings').select('value').eq('key', 'vip_access').maybeSingle(),
-    supabase.from('memberships').select('vip_until, balance_usd').eq('user_id', userId).maybeSingle(),
+    supabase.from('memberships').select('vip_until, balance_usd, vip_seconds').eq('user_id', userId).maybeSingle(),
   ]);
   const access: VipAccess = setting?.value === 'everyone' || setting?.value === 'off' ? setting.value : 'members';
   const vipUntil = membership?.vip_until && new Date(membership.vip_until) > new Date() ? membership.vip_until : null;
   return {
-    access, vipUntil, canUseVip: access === 'everyone' || (access === 'members' && !!vipUntil),
+    access, vipUntil, canUseVip: access === 'everyone' || (access === 'members' && (!!vipUntil || (membership?.vip_seconds ?? 0) > 0)),
     balanceUsd: Number(membership?.balance_usd ?? 0),
+    vipSeconds: membership?.vip_seconds ?? 0,
   };
 }
 
@@ -217,6 +220,7 @@ export interface AdminUser {
   last_seen: string;
   vip_until: string | null;
   balance_usd: number;
+  vip_seconds: number;
 }
 
 export interface AdminOverview {
@@ -270,6 +274,20 @@ export async function adminGrantHours(pin: string, userId: string, hours: number
   const { data, error } = await supabase.rpc('admin_grant_hours', { p_pin: pin, p_user: userId, p_hours: hours });
   if (error) throw adminError(error);
   return data === true;
+}
+
+/** Counts seconds of a VIP call against my talk time. Returns seconds left, or -1 when not metered. */
+export async function consumeVipSeconds(seconds: number): Promise<number> {
+  const { data, error } = await supabase.rpc('consume_vip_seconds', { p_seconds: Math.round(seconds) });
+  if (error) throw error;
+  return data as number;
+}
+
+/** Buys a package from my balance; VIP starts at once */
+export async function buyWithBalance(plan: string): Promise<'ok' | 'insufficient' | 'invalid_plan'> {
+  const { data, error } = await supabase.rpc('buy_with_balance', { p_plan: plan });
+  if (error) throw error;
+  return data as 'ok' | 'insufficient' | 'invalid_plan';
 }
 
 export async function markMessagesRead(roomId: string, userId: string) {

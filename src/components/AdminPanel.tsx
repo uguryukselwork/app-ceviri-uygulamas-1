@@ -9,7 +9,7 @@ import {
   adminCheckPin, adminOverview, adminSetVipAccess, adminCreatePromo, adminDeletePromo, adminDecideRequest, adminAddBalance, adminGrantHours,
   type AdminOverview, type AdminUser, type VipAccess, type VipRequest
 } from '../lib/api';
-import { describePlan } from '../lib/plans';
+import { describePlan, PACKAGES, PERIODS, formatTalkTime } from '../lib/plans';
 
 const ACCESS_OPTIONS: { id: VipAccess; title: string; description: string; icon: React.ReactNode; tone: string }[] = [
   {
@@ -41,7 +41,6 @@ const GIFT_DURATIONS = [
   { days: 365, label: '1 yıl' },
 ];
 
-const DOLLAR_AMOUNTS = [5, 10, 20, 50];
 const USAGE_HOURS = [
   { hours: 1, label: '1 saat' },
   { hours: 2, label: '2 saat' },
@@ -161,7 +160,7 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
 
   const sendHours = (user: AdminUser, hours: number) =>
     run(`hours-${user.user_id}`, () => adminGrantHours(pin, user.user_id, hours),
-      `${user.name} kullanıcısına ${hours} saat VIP kullanım hakkı gönderildi.`);
+      `${user.name} kullanıcısına ${hours} saat VIP konuşma hakkı gönderildi.`);
 
   const copy = async (code: string) => {
     try {
@@ -401,6 +400,7 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
                               </span>
                               <span className="block text-[12px] text-(--theme-muted)">
                                 {u.vip_until ? `VIP · ${formatDate(u.vip_until)} kadar` : 'Ücretsiz'} · Bakiye {formatUsd(u.balance_usd)}
+                                {u.vip_seconds > 0 && ` · Konuşma ${formatTalkTime(u.vip_seconds)}`}
                               </span>
                             </span>
                             <ChevronDown className={cn('w-4 h-4 shrink-0 text-(--theme-muted) transition-transform', expanded && 'rotate-180')} />
@@ -412,17 +412,23 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
                                 <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-(--theme-muted)">
                                   <Wallet className="w-3.5 h-3.5" /> Bakiyeye dolar gönder
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {DOLLAR_AMOUNTS.map(a => (
-                                    <button
-                                      key={a}
-                                      type="button"
-                                      disabled={!!busy}
-                                      onClick={() => sendDollars(u, a)}
-                                      className="px-3.5 py-2 rounded-2xl bg-(--theme-accent-light) text-(--theme-accent) text-[13.5px] font-bold hover:bg-(--theme-accent) hover:text-(--theme-on-accent) disabled:opacity-50 cursor-pointer"
-                                    >
-                                      +{a}$
-                                    </button>
+                                <p className="text-[12px] text-(--theme-muted) px-0.5">Paket fiyatını gönder, kullanıcı bakiyesiyle o paketi hemen alabilsin.</p>
+                                <div className="space-y-1.5">
+                                  {PERIODS.map(period => (
+                                    <div key={period.id} className="flex items-center gap-2">
+                                      <span className="w-16 shrink-0 text-[12.5px] font-bold text-(--theme-ink)">{period.label}</span>
+                                      {PACKAGES.filter(pkg => pkg.id !== 'free').map(pkg => (
+                                        <button
+                                          key={pkg.id}
+                                          type="button"
+                                          disabled={!!busy}
+                                          onClick={() => sendDollars(u, pkg.basePrices[period.id])}
+                                          className="flex-1 px-2 py-2 rounded-2xl bg-(--theme-accent-light) text-(--theme-accent) text-[12.5px] font-bold hover:bg-(--theme-accent) hover:text-(--theme-on-accent) disabled:opacity-50 cursor-pointer"
+                                        >
+                                          {pkg.name} {formatUsd(pkg.basePrices[period.id])}
+                                        </button>
+                                      ))}
+                                    </div>
                                   ))}
                                 </div>
                                 <form
@@ -449,7 +455,7 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
 
                               <div className="space-y-2">
                                 <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-(--theme-muted)">
-                                  <Clock className="w-3.5 h-3.5" /> VIP kullanım hakkı gönder
+                                  <Clock className="w-3.5 h-3.5" /> VIP konuşma hakkı gönder (konuştukça düşer)
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {USAGE_HOURS.map(h => (

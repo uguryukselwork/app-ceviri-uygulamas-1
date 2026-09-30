@@ -23,7 +23,7 @@ import SecurityLockModal from '../components/SecurityLockModal';
 import { primaryButton } from '../components/ui';
 import {
   findRoom, upsertParticipant, fetchParticipants, fetchMessages, sendMessage,
-  requestTranslation, markMessagesRead, subscribeToRoom, fetchVipStatus, type Participant, type VipStatus
+  requestTranslation, markMessagesRead, subscribeToRoom, fetchVipStatus, consumeVipSeconds, type Participant, type VipStatus
 } from '../lib/api';
 
 export default function Room() {
@@ -71,6 +71,7 @@ export default function Room() {
   const playerRef = useRef(new PcmPlayer());
   const inCallRef = useRef(false);
   inCallRef.current = inCall;
+  const [callMode, setCallMode] = useState<VoiceMode>('free');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -365,6 +366,7 @@ export default function Room() {
     setVoiceError(null);
     setMuted(false);
     setInCall(true);
+    setCallMode(mode);
     liveRef.current?.setInCall(true, mode);
     // Only sentences spoken from now on are read aloud
     spokenIds.current = new Set(messages.map(m => m.id));
@@ -406,6 +408,24 @@ export default function Room() {
     setMyCaption('');
     setPartnerCaption('');
   };
+
+  // VIP talk time runs down while a VIP call is connected and the microphone is on
+  useEffect(() => {
+    if (!inCall || callMode !== 'paid' || voiceState !== 'live' || muted) return;
+    const TICK = 10;
+    const timer = setInterval(() => {
+      consumeVipSeconds(TICK).then(left => {
+        if (left < 0) return; // package or free-for-all: not metered
+        setVipStatus(s => s && { ...s, vipSeconds: left });
+        if (left === 0) {
+          endCall();
+          setVoiceError('VIP konuşma hakkın bitti');
+          refreshVipStatus();
+        }
+      }).catch(() => {});
+    }, TICK * 1000);
+    return () => clearInterval(timer);
+  }, [inCall, callMode, voiceState, muted]);
 
   const toggleMute = () => {
     const next = !muted;

@@ -6,10 +6,10 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { SheetHeader, Segmented, primaryButton, secondaryButton } from '../components/ui';
 import {
-  fetchVipStatus, fetchMyLatestRequest, subscribeToMembership, requestVip,
+  fetchVipStatus, fetchMyLatestRequest, subscribeToMembership, requestVip, buyWithBalance,
   type VipStatus, type VipRequest
 } from '../lib/api';
-import { PACKAGES, PERIODS, type Period, periodMinutes, yearlySaving, formatUsd, planKey, describePlan } from '../lib/plans';
+import { PACKAGES, PERIODS, type Period, periodMinutes, yearlySaving, formatUsd, formatTalkTime, planKey, describePlan } from '../lib/plans';
 
 const formatDate = (iso: string) => new Date(iso).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -63,6 +63,25 @@ export default function Plans() {
     }
   };
 
+  const buy = async (plan: string) => {
+    if (busy) return;
+    setBusy(plan);
+    setNotice(null);
+    try {
+      const result = await buyWithBalance(plan);
+      if (result === 'ok') {
+        await refresh();
+        setCelebrate(true);
+      } else {
+        setNotice({ tone: 'error', text: result === 'insufficient' ? 'Bakiyen bu paket için yetmiyor.' : 'Bu paket bulunamadı.' });
+      }
+    } catch {
+      setNotice({ tone: 'error', text: 'Satın alınamadı. Bağlantını kontrol et.' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const isVip = !!status?.vipUntil;
   const pending = request?.status === 'pending' ? request : null;
 
@@ -107,6 +126,14 @@ export default function Plans() {
                   <Wallet className="w-4 h-4 text-(--theme-accent)" /> Bakiyen
                 </span>
                 <span className="font-display font-semibold text-xl text-(--theme-ink)">{formatUsd(status.balanceUsd)}</span>
+              </div>
+            )}
+            {status && status.vipSeconds > 0 && (
+              <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl bg-amber-500/10 px-4 py-3">
+                <span className="flex items-center gap-2 text-[14px] font-semibold text-(--theme-ink)">
+                  <Clock className="w-4 h-4 text-amber-600" /> VIP konuşma hakkın
+                </span>
+                <span className="font-display font-semibold text-xl text-(--theme-ink)">{formatTalkTime(status.vipSeconds)}</span>
               </div>
             )}
             {pending && (
@@ -171,6 +198,8 @@ export default function Plans() {
             {PACKAGES.filter(pkg => pkg.id !== 'free').map(pkg => {
               const key = planKey(pkg.id, period);
               const unit = PERIODS.find(p => p.id === period)!.unit;
+              const price = pkg.basePrices[period];
+              const affordable = (status?.balanceUsd ?? 0) >= price;
               return (
                 <div
                   key={pkg.id}
@@ -218,12 +247,14 @@ export default function Plans() {
 
                   <button
                     type="button"
-                    disabled={!!busy || !!pending}
-                    onClick={() => sendRequest('purchase', key)}
+                    disabled={!!busy || (!!pending && !affordable)}
+                    onClick={() => affordable ? buy(key) : sendRequest('purchase', key)}
                     className={cn(pkg.highlight ? primaryButton : secondaryButton, 'mt-5 py-3.5')}
                   >
                     {busy === key ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {pending?.plan === key ? 'Talebin onay bekliyor' : `${formatUsd(pkg.basePrices[period])} ile satın al`}
+                    {pending?.plan === key ? 'Talebin onay bekliyor'
+                      : affordable ? `Bakiyeden öde (${formatUsd(price)})`
+                      : `${formatUsd(price)} ile satın al`}
                   </button>
                 </div>
               );

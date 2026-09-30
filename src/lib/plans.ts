@@ -79,6 +79,13 @@ export const yearlySaving = (pkg: Package) =>
 
 export const formatUsd = (value: number) => `$${value.toFixed(2)}`;
 
+/** Talk time left: '1 sa 5 dk', '45 dk' */
+export const formatTalkTime = (seconds: number) => {
+  const minutes = Math.ceil(seconds / 60);
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  return h ? (m ? `${h} sa ${m} dk` : `${h} saat`) : `${m} dk`;
+};
+
 /** 'standard:monthly', as stored with a purchase request */
 export const planKey = (pkg: PackageId, period: Period) => `${pkg}:${period}`;
 

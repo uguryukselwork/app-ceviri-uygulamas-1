@@ -53,15 +53,18 @@ Deno.serve(async (req) => {
   const { data: access } = await admin.from("app_settings").select("value").eq("key", "vip_access").maybeSingle();
   const mode = access?.value ?? "members";
   if (mode === "off") return json({ error: "vip_off" }, 403);
+  // Talk time left for users without a running package: the token cannot outlive it
+  let sessionMs = 30 * 60 * 1000;
   if (mode !== "everyone") {
     const { data: membership } = await admin
       .from("memberships")
-      .select("vip_until")
+      .select("vip_until, vip_seconds")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!membership?.vip_until || new Date(membership.vip_until) <= new Date()) {
-      return json({ error: "vip_required" }, 403);
-    }
+    const hasPackage = !!membership?.vip_until && new Date(membership.vip_until) > new Date();
+    const talkSeconds = membership?.vip_seconds ?? 0;
+    if (!hasPackage && talkSeconds <= 0) return json({ error: "vip_required" }, 403);
+    if (!hasPackage) sessionMs = Math.min(sessionMs, (talkSeconds + 30) * 1000);
   }
 
   const config = {
@@ -76,8 +79,8 @@ Deno.serve(async (req) => {
     const token = await ai.authTokens.create({
       config: {
         uses: 1,
-        expireTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        newSessionExpireTime: new Date(Date.now() + 60 * 1000).toISOString(),
+        expireTime: new Date(Date.now() + sessionMs).toISOString(),
+        newSessionExpireTime: new Date(Date.now() + Math.min(60 * 1000, sessionMs)).toISOString(),
         liveConnectConstraints: { model: LIVE_MODEL, config },
         httpOptions: { apiVersion: "v1alpha" },
       },
