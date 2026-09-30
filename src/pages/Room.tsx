@@ -1,9 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import RoomHeader from '../components/RoomHeader';
 import ChatInput from '../components/ChatInput';
-import ChatMessage, { MessageType } from '../components/ChatMessage';
+import ChatMessage, { MessageType, readableText } from '../components/ChatMessage';
+import VoiceCallBar from '../components/VoiceCallBar';
+import { joinLiveChannel, type LiveChannel } from '../lib/live';
+import {
+  VoiceTranslator, BrowserVoiceTranslator, PcmPlayer, speak,
+  type VoiceState, type VoiceEngine, type VoiceMode
+} from '../lib/voice';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Pencil, Trash2, Check, Plus, Wand2, Lock, Unlock } from 'lucide-react';
 import { LANGUAGES, t, plainLanguageName } from '../lib/i18n';
@@ -16,7 +22,7 @@ import SecurityLockModal from '../components/SecurityLockModal';
 import { primaryButton } from '../components/ui';
 import {
   findRoom, upsertParticipant, fetchParticipants, fetchMessages, sendMessage,
-  requestTranslation, markMessagesRead, subscribeToRoom, type Participant
+  requestTranslation, markMessagesRead, subscribeToRoom, fetchVoiceMode, type Participant
 } from '../lib/api';
 
 export default function Room() {
@@ -43,7 +49,26 @@ export default function Room() {
   const [showParticipants, setShowParticipants] = useState(false);
   const [showOriginal, setShowOriginal] = useState(true);
   const [codeCopied, setCodeCopied] = useState(false);
-  
+
+  // Replies
+  const [replyTo, setReplyTo] = useState<MessageType | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  // Typing indicator and live voice translation (see lib/live.ts, lib/voice.ts)
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [callMembers, setCallMembers] = useState<string[]>([]);
+  const [inCall, setInCall] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceState>('connecting');
+  const [muted, setMuted] = useState(false);
+  const [myCaption, setMyCaption] = useState('');
+  const [partnerCaption, setPartnerCaption] = useState('');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const liveRef = useRef<LiveChannel | null>(null);
+  const translatorRef = useRef<VoiceEngine | null>(null);
+  const playerRef = useRef(new PcmPlayer());
+  const inCallRef = useRef(false);
+  inCallRef.current = inCall;
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom
@@ -53,7 +78,7 @@ export default function Room() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, typingUsers.length]);
 
   // Mark the partner's messages as seen while the room is on screen, and again when the app comes back to the front
   useEffect(() => {
@@ -191,18 +216,16 @@ export default function Room() {
     }
   }, [profile.language, profile.avatarUrl, profile.status, profile.name, profile.gender, hideProfile, roomId]);
 
-  const handleSendMessage = async (text: string) => {
-    if (!roomId) return;
-
-    // Target language: my explicit choice, else the partner's language, else the other of tr/en
+  // Target language: my explicit choice, else the partner's language, else the other of tr/en
+  const targetLanguage = () => {
     const otherParticipant = participants.find(p => p.user_id !== profile.id);
-    let targetLang = profile.language === 'tr' ? 'en' : 'tr';
-    if (profile.partnerLanguage && profile.partnerLanguage !== 'auto') {
-      targetLang = profile.partnerLanguage;
-    } else if (otherParticipant?.language && otherParticipant.language !== 'auto') {
-      targetLang = otherParticipant.language;
-    }
+    if (profile.partnerLanguage && profile.partnerLanguage !== 'auto') return profile.partnerLanguage;
+    if (otherParticipant?.language && otherParticipant.language !== 'auto') return otherParticipant.language;
+    return profile.language === 'tr' ? 'en' : 'tr';
+  };
 
+  const postMessage = async (text: string, extra: { reply_to_id?: string | null; is_voice?: boolean } = {}, spoken?: string) => {
+    if (!roomId) return;
     try {
       const input = participantInput();
       const sent = await sendMessage({
@@ -212,13 +235,159 @@ export default function Room() {
         sender_avatar: input.avatarUrl,
         original_text: text,
         original_language: profile.language,
-        target_language: targetLang
-      });
+        target_language: targetLanguage(),
+        ...extra,
+      }, spoken);
       // Show it right away; the realtime insert for the same id is ignored
       setMessages(prev => prev.some(m => m.id === sent.id) ? prev : [...prev, sent]);
     } catch (error) {
       console.error('Send message error:', error);
     }
+  };
+
+  const handleSendMessage = (text: string) => {
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+    void postMessage(text, { reply_to_id: replyId });
+  };
+
+  // Latest sender for voice sentences, which arrive from the translator long after it started
+  const postMessageRef = useRef(postMessage);
+  postMessageRef.current = postMessage;
+
+  // Typing, call presence and relayed voice for this room
+  useEffect(() => {
+    if (!roomId) return;
+    const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const live = joinLiveChannel(roomId, profile.id, {
+      onTyping: (userId, typing) => {
+        clearTimeout(typingTimers.get(userId));
+        setTypingUsers(prev => typing ? (prev.includes(userId) ? prev : [...prev, userId]) : prev.filter(id => id !== userId));
+        // Missed "stopped typing" events (closed app, lost signal) must not leave it stuck
+        if (typing) typingTimers.set(userId, setTimeout(() => setTypingUsers(prev => prev.filter(id => id !== userId)), 6000));
+      },
+      onCallMembers: setCallMembers,
+      onAudio: (_from, data) => {
+        if (inCallRef.current) playerRef.current.play(data);
+      },
+      onCaption: (_from, text) => {
+        if (inCallRef.current) setPartnerCaption(text);
+      },
+    });
+    liveRef.current = live;
+    return () => {
+      typingTimers.forEach(clearTimeout);
+      translatorRef.current?.stop();
+      translatorRef.current = null;
+      live.leave();
+      liveRef.current = null;
+      setInCall(false);
+      setTypingUsers([]);
+      setCallMembers([]);
+    };
+  }, [roomId, profile.id]);
+
+  // A new message from someone ends their "yazıyor…" (translation updates of older ones do not)
+  const lastMessageId = useRef<string | null>(null);
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.id === lastMessageId.current) return;
+    lastMessageId.current = last.id;
+    setTypingUsers(prev => prev.filter(id => id !== last.sender_id));
+  }, [messages]);
+
+  // Admin's choice (hidden panel on the home screen); read before each call so a change applies to the next one
+  const voiceModeRef = useRef<VoiceMode>('free');
+  const refreshVoiceMode = () => { fetchVoiceMode().then(m => { voiceModeRef.current = m; }).catch(() => {}); };
+  useEffect(refreshVoiceMode, [roomId]);
+
+  // Free mode: the partner's voice sentences arrive as messages and are read aloud here, one after another
+  const spokenIds = useRef(new Set<string>());
+  const speechQueue = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    if (!inCall || voiceModeRef.current !== 'free') return;
+    for (const m of messages) {
+      if (!m.is_voice || m.sender_id === profile.id || m.translation_status !== 'completed' || spokenIds.current.has(m.id)) continue;
+      spokenIds.current.add(m.id);
+      const text = m.translated_text || m.original_text;
+      speechQueue.current = speechQueue.current.then(async () => {
+        if (!inCallRef.current) return;
+        const engine = translatorRef.current;
+        if (engine instanceof BrowserVoiceTranslator) engine.setHeld(true);
+        setPartnerCaption(text);
+        await speak(text, profile.language);
+        setPartnerCaption('');
+        if (engine instanceof BrowserVoiceTranslator) engine.setHeld(false);
+      });
+    }
+  }, [messages, inCall]);
+
+  const onEngineState = (state: VoiceState, error?: string) => {
+    setVoiceState(state);
+    if (state === 'error') {
+      setVoiceError(error || '');
+      endCall();
+    }
+  };
+
+  // Called straight from a tap: browsers only allow the microphone and sound to start inside one
+  const startCall = () => {
+    if (!roomId || translatorRef.current) return;
+    setVoiceError(null);
+    setMuted(false);
+    setInCall(true);
+    liveRef.current?.setInCall(true);
+    // Only sentences spoken from now on are read aloud
+    spokenIds.current = new Set(messages.map(m => m.id));
+
+    const engine: VoiceEngine = voiceModeRef.current === 'paid'
+      ? new VoiceTranslator({
+          roomId,
+          targetLanguage: targetLanguage(),
+          isHearingPartner: () => playerRef.current.isPlaying,
+          onState: onEngineState,
+          onAudio: (data) => liveRef.current?.sendAudio(data),
+          onCaption: (translated, original) => {
+            setMyCaption(original);
+            liveRef.current?.sendCaption(translated);
+          },
+          onSentence: (original, translated) => {
+            void postMessageRef.current(original, { is_voice: true }, translated || undefined);
+          },
+        })
+      : new BrowserVoiceTranslator({
+          language: profile.language,
+          onState: onEngineState,
+          onCaption: setMyCaption,
+          onSentence: (original) => { void postMessageRef.current(original, { is_voice: true }); },
+        });
+    translatorRef.current = engine;
+    void engine.start();
+  };
+
+  const endCall = () => {
+    translatorRef.current?.stop();
+    translatorRef.current = null;
+    setInCall(false);
+    liveRef.current?.setInCall(false);
+    playerRef.current.reset();
+    setMyCaption('');
+    setPartnerCaption('');
+    refreshVoiceMode();
+  };
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    translatorRef.current?.setMuted(next);
+  };
+
+  const messageById = useMemo(() => new Map(messages.map(m => [m.id, m])), [messages]);
+
+  const jumpToMessage = (id: string) => {
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightId(id);
+    setTimeout(() => setHighlightId(current => current === id ? null : current), 1600);
   };
 
   const handleRetryTranslation = async (msgId: string) => {
@@ -251,6 +420,9 @@ export default function Room() {
         isConnected={isConnected}
         onOpenSettings={() => setShowSettings(true)}
         onOpenParticipants={() => setShowParticipants(true)}
+        partnerTyping={!!partner && typingUsers.includes(partner.user_id)}
+        onStartCall={partner && isConnected ? startCall : undefined}
+        inCall={inCall}
       />
 
       {/* Chat Area - Header and Input stay fixed while only messages scroll */}
@@ -291,15 +463,68 @@ export default function Room() {
             message={msg}
             showOriginal={showOriginal}
             onRetry={handleRetryTranslation}
+            onReply={setReplyTo}
+            replyTo={msg.reply_to_id ? messageById.get(msg.reply_to_id) : null}
+            onJumpTo={jumpToMessage}
+            highlighted={highlightId === msg.id}
             isFirstInGroup={messages[i - 1]?.sender_id !== msg.sender_id}
             isLastInGroup={messages[i + 1]?.sender_id !== msg.sender_id}
             avatarUrl={participants.find(p => p.user_id === msg.sender_id)?.avatarUrl}
           />
         ))}
+
+        {partner && typingUsers.includes(partner.user_id) && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 mb-2 ml-10"
+            role="status"
+            aria-label={t('room.typing', profile.language, { name: partner.name })}
+          >
+            <span className="inline-flex items-center gap-2 px-4 py-3 rounded-[1.4rem] rounded-bl-md bg-(--theme-card-bg) border border-(--theme-border) text-(--theme-muted)">
+              <span className="translating-dots inline-flex items-center gap-1" aria-hidden>
+                <span /><span /><span />
+              </span>
+              <span className="text-[13px] font-semibold">{t('room.typing', profile.language, { name: partner.name })}</span>
+            </span>
+          </motion.div>
+        )}
         <div ref={messagesEndRef} className="h-4 shrink-0" />
       </div>
 
-      <ChatInput onSend={handleSendMessage} disabled={!isConnected} />
+      {voiceError !== null && !inCall && (
+        <div role="alert" className="mx-3 mb-1 flex items-center gap-2 rounded-2xl bg-red-500/10 border border-red-500/40 text-red-600 text-[13px] font-bold pl-3 pr-1 py-1">
+          <span className="flex-1">{t('call.error', profile.language, { reason: voiceError })}</span>
+          <button type="button" onClick={() => setVoiceError(null)} aria-label={t('common.close', profile.language)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-500/10 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <VoiceCallBar
+        lang={profile.language}
+        partnerName={partner?.name || t('room.waiting_partner', profile.language)}
+        inCall={inCall}
+        partnerInCall={!!partner && callMembers.includes(partner.user_id)}
+        state={voiceState}
+        muted={muted}
+        myCaption={myCaption}
+        partnerCaption={partnerCaption}
+        onJoin={startCall}
+        onToggleMute={toggleMute}
+        onEnd={endCall}
+      />
+
+      <ChatInput
+        onSend={handleSendMessage}
+        disabled={!isConnected}
+        replyTo={replyTo ? {
+          name: replyTo.sender_id === profile.id ? t('msg.you', profile.language) : replyTo.sender_name,
+          text: readableText(replyTo, profile.id),
+        } : null}
+        onCancelReply={() => setReplyTo(null)}
+        onTyping={(typing) => liveRef.current?.setTyping(typing)}
+      />
 
       {/* Settings Overlay */}
       <AnimatePresence>

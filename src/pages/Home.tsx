@@ -7,6 +7,11 @@ import { t } from '../lib/i18n';
 import { cn, compressImage } from '../lib/utils';
 import SettingsSheet from '../components/SettingsSheet';
 import AccountSheet from '../components/AccountSheet';
+import AdminPanel from '../components/AdminPanel';
+
+/** Taps on the logo, each within this long of the previous one, that open the admin panel */
+const ADMIN_TAPS = 5;
+const ADMIN_TAP_GAP_MS = 1500;
 
 
 const headerButton = 'w-10 h-10 rounded-full flex items-center justify-center bg-(--theme-card-bg) border border-(--theme-border) text-(--theme-muted) hover:text-(--theme-ink) transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--theme-accent)';
@@ -76,6 +81,18 @@ export default function Home() {
   const [gender, setGender] = useState<Gender | null>(profile.gender);
   const [showSettings, setShowSettings] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const logoTaps = useRef({ count: 0, last: 0 });
+  const handleLogoTap = () => {
+    const now = Date.now();
+    const taps = logoTaps.current;
+    taps.count = now - taps.last < ADMIN_TAP_GAP_MS ? taps.count + 1 : 1;
+    taps.last = now;
+    if (taps.count >= ADMIN_TAPS) {
+      taps.count = 0;
+      setShowAdmin(true);
+    }
+  };
   const [accountReason, setAccountReason] = useState<string | null>(null);
   // Where to go once the user signs in from the "create/join" prompt
   const [pendingPath, setPendingPath] = useState<string | null>(null);
@@ -147,7 +164,10 @@ export default function Home() {
       {/* Header */}
       <header className="w-full flex items-center justify-between px-5 pt-5 pb-2 z-20">
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-(--theme-accent-light) text-(--theme-accent) flex items-center justify-center">
+          <div
+            onClick={handleLogoTap}
+            className="w-10 h-10 rounded-2xl bg-(--theme-accent-light) text-(--theme-accent) flex items-center justify-center select-none [-webkit-tap-highlight-color:transparent]"
+          >
             <Languages className="w-5 h-5" />
           </div>
           <span className="font-display font-semibold text-xl text-(--theme-ink)">LiveTranslate</span>
@@ -339,6 +359,7 @@ export default function Home() {
         reason={accountReason}
       />
       <SettingsSheet open={showSettings} onClose={() => setShowSettings(false)} />
+      <AdminPanel open={showAdmin} onClose={() => setShowAdmin(false)} />
     </div>
   );
 }

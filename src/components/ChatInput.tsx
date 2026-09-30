@@ -1,15 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Zap, Plus, X, Pencil, Trash2, Check } from 'lucide-react';
+import { Send, Zap, Plus, X, Pencil, Trash2, Check, Reply } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import { t, getDefaultQuickMessages } from '../lib/i18n';
 
+/** Tell the partner "yazıyor…" at most this often while typing */
+const TYPING_PING_MS = 2500;
+/** Stop showing "yazıyor…" after this much inactivity */
+const TYPING_IDLE_MS = 3500;
+
 interface ChatInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
+  /** The message being answered, shown above the field */
+  replyTo?: { name: string; text: string } | null;
+  onCancelReply?: () => void;
+  onTyping?: (typing: boolean) => void;
 }
 
-export default function ChatInput({ onSend, disabled }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, onTyping }: ChatInputProps) {
   const { profile, quickMessages: savedQuickMessages, addQuickMessage, removeQuickMessage, updateQuickMessage } = useStore();
   const quickMessages = savedQuickMessages ?? getDefaultQuickMessages(profile.language);
   const lang = profile.language;
@@ -39,9 +48,37 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
     setEditText('');
   };
 
+  // "yazıyor…": ping while keys are pressed, clear after a pause or on send
+  const lastTypingPing = useRef(0);
+  const typingIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopTyping = () => {
+    if (typingIdleTimer.current) clearTimeout(typingIdleTimer.current);
+    typingIdleTimer.current = null;
+    if (lastTypingPing.current) onTyping?.(false);
+    lastTypingPing.current = 0;
+  };
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (!onTyping) return;
+    if (!value.trim()) return stopTyping();
+    const now = Date.now();
+    if (now - lastTypingPing.current > TYPING_PING_MS) {
+      lastTypingPing.current = now;
+      onTyping(true);
+    }
+    if (typingIdleTimer.current) clearTimeout(typingIdleTimer.current);
+    typingIdleTimer.current = setTimeout(stopTyping, TYPING_IDLE_MS);
+  };
+  useEffect(() => () => { if (typingIdleTimer.current) clearTimeout(typingIdleTimer.current); }, []);
+
+  useEffect(() => {
+    if (replyTo) textareaRef.current?.focus();
+  }, [replyTo]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (text.trim() && !disabled) {
+      stopTyping();
       onSend(text.trim());
       setText('');
       // Reset height
@@ -85,7 +122,26 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
       onSubmit={handleSubmit}
       className="px-3 pt-2 pb-3 app-page-bg flex items-end gap-2 shrink-0 pb-safe z-20 transition-colors"
     >
-      <div className="flex-1 relative bg-(--theme-card-bg) rounded-[1.6rem] border-2 border-(--theme-border) focus-within:border-(--theme-accent) transition-colors flex items-end">
+      <div className="flex-1 min-w-0 relative bg-(--theme-card-bg) rounded-[1.6rem] border-2 border-(--theme-border) focus-within:border-(--theme-accent) transition-colors flex flex-col">
+        {replyTo && (
+          <div className="flex items-center gap-2 mx-2 mt-2 pl-2.5 pr-1 py-1.5 rounded-2xl bg-(--theme-subtle-bg) border-l-4 border-(--theme-accent)">
+            <Reply className="w-4 h-4 shrink-0 text-(--theme-accent)" aria-hidden />
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] font-bold text-(--theme-accent) truncate">{replyTo.name}</div>
+              <div className="text-[13px] text-(--theme-muted) truncate">{replyTo.text}</div>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              aria-label={t('msg.reply_cancel', lang)}
+              title={t('msg.reply_cancel', lang)}
+              className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-(--theme-muted) hover:text-(--theme-ink) hover:bg-(--theme-card-bg) transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        <div className="flex items-end">
         <div className="relative shrink-0 flex items-center justify-center p-1.5 pl-2" ref={popoverRef}>
           <button
             type="button"
@@ -252,13 +308,15 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => handleTextChange(e.target.value)}
+          onBlur={stopTyping}
           onKeyDown={handleKeyDown}
           placeholder={t('room.type_message', profile.language)}
           disabled={disabled}
           rows={1}
           className="w-full max-h-32 bg-transparent border-none outline-none focus:ring-0 resize-none py-3 pr-4 text-[16px] sm:text-[15px] text-(--theme-ink) placeholder:text-(--theme-muted) disabled:opacity-50"
         />
+        </div>
       </div>
       
       <button

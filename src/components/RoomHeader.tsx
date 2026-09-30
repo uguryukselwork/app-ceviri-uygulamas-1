@@ -1,4 +1,4 @@
-import { ArrowLeft, Settings, Copy, CheckCircle2, Share2, Users, EyeOff } from 'lucide-react';
+import { ArrowLeft, Settings, Copy, CheckCircle2, Share2, Users, EyeOff, AudioLines } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
@@ -14,9 +14,14 @@ interface RoomHeaderProps {
   isConnected: boolean;
   onOpenSettings: () => void;
   onOpenParticipants?: () => void;
+  /** Partner is typing right now */
+  partnerTyping?: boolean;
+  /** Starts live voice translation; hidden until a partner is in the room */
+  onStartCall?: () => void;
+  inCall?: boolean;
 }
 
-export default function RoomHeader({ roomCode, partnerName, partnerGender, partnerAvatar, partnerStatus, participantsCount = 0, isConnected, onOpenSettings, onOpenParticipants }: RoomHeaderProps) {
+export default function RoomHeader({ roomCode, partnerName, partnerGender, partnerAvatar, partnerStatus, participantsCount = 0, isConnected, onOpenSettings, onOpenParticipants, partnerTyping, onStartCall, inCall }: RoomHeaderProps) {
   const navigate = useNavigate();
   const { profile, savedRooms, hideProfile } = useStore();
   const [copiedCode, setCopiedCode] = useState(false);
@@ -129,7 +134,9 @@ export default function RoomHeader({ roomCode, partnerName, partnerGender, partn
                 {hasPartner ? displayName : t('room.waiting_partner', profile.language)}
               </h2>
               <p className="text-xs font-semibold text-(--theme-muted) truncate">
-                {hasPartner ? statusText : t('room.connecting', profile.language)}
+                {hasPartner && partnerTyping
+                  ? <span className="text-(--theme-accent)">{t('room.typing_short', profile.language)}</span>
+                  : hasPartner ? statusText : t('room.connecting', profile.language)}
                 {participantsCount > 0 && (
                   <span className="inline-flex items-center gap-0.5 ml-1.5 align-middle">
                     · <Users className="w-3 h-3 ml-1" aria-hidden />{participantsCount}
@@ -150,6 +157,20 @@ export default function RoomHeader({ roomCode, partnerName, partnerGender, partn
             >
               <EyeOff className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Gizli</span>
+            </button>
+          )}
+
+          {onStartCall && (
+            <button
+              onClick={onStartCall}
+              disabled={inCall}
+              className={inCall
+                ? 'w-10 h-10 mr-0.5 rounded-full flex items-center justify-center bg-(--theme-accent) text-(--theme-on-accent)'
+                : 'w-10 h-10 mr-0.5 rounded-full flex items-center justify-center bg-(--theme-accent-light) text-(--theme-accent) hover:bg-(--theme-accent) hover:text-(--theme-on-accent) transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--theme-accent)'}
+              aria-label={t('call.start', profile.language)}
+              title={t('call.start', profile.language)}
+            >
+              <AudioLines className="w-5 h-5" />
             </button>
           )}
 

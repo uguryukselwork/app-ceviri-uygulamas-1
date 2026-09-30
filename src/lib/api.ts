@@ -81,9 +81,10 @@ export async function fetchMessages(roomId: string): Promise<MessageType[]> {
   return (data ?? []) as MessageType[];
 }
 
-/** Asks the translate edge function to (re)translate a message; the result arrives via realtime */
-export async function requestTranslation(messageId: string) {
-  const { error } = await supabase.functions.invoke('translate', { body: { message_id: messageId } });
+/** Asks the translate edge function to (re)translate a message; the result arrives via realtime.
+ *  For my own voice messages, `spoken` is the translation the partner already heard. */
+export async function requestTranslation(messageId: string, spoken?: string) {
+  const { error } = await supabase.functions.invoke('translate', { body: { message_id: messageId, translation: spoken } });
   if (error) console.error('Translation request failed', error);
 }
 
@@ -95,7 +96,9 @@ export async function sendMessage(msg: {
   original_text: string;
   original_language: string;
   target_language: string;
-}): Promise<MessageType> {
+  reply_to_id?: string | null;
+  is_voice?: boolean;
+}, spokenTranslation?: string): Promise<MessageType> {
   // Clamp target language to supported codes; fallback to opposite of source if unsupported
   const supported = ['tr', 'en', 'de', 'fr', 'es', 'it', 'ru', 'ar', 'ja', 'ko', 'th', 'tk'];
   let targetLang = msg.target_language;
@@ -105,8 +108,27 @@ export async function sendMessage(msg: {
   }
   const { data, error } = await supabase.from('messages').insert({ ...msg, target_language: targetLang }).select('*').single();
   if (error) throw error;
-  void requestTranslation(data.id);
+  void requestTranslation(data.id, spokenTranslation);
   return data as MessageType;
+}
+
+/** Voice translation mode chosen by the admin; 'free' when unset or unreadable */
+export async function fetchVoiceMode(): Promise<'free' | 'paid'> {
+  const { data } = await supabase.from('app_settings').select('value').eq('key', 'voice_mode').maybeSingle();
+  return data?.value === 'paid' ? 'paid' : 'free';
+}
+
+/** Checks the admin PIN on the server. Throws 'too_many_attempts' after repeated wrong PINs. */
+export async function adminCheckPin(pin: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_check_pin', { p_pin: pin });
+  if (error) throw new Error(error.message.includes('too_many_attempts') ? 'too_many_attempts' : error.message);
+  return data === true;
+}
+
+export async function adminSetVoiceMode(pin: string, mode: 'free' | 'paid'): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_set_voice_mode', { p_pin: pin, p_mode: mode });
+  if (error) throw new Error(error.message.includes('too_many_attempts') ? 'too_many_attempts' : error.message);
+  return data === true;
 }
 
 export async function markMessagesRead(roomId: string, userId: string) {

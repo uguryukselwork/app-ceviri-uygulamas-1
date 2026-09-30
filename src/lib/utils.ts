@@ -17,7 +17,7 @@ export const generateRoomCode = () => {
 // One shared AudioContext: browsers cap how many can exist, so a new one per sound eventually fails
 let audioCtx: AudioContext | null = null;
 
-const getAudioContext = (): AudioContext | null => {
+export const getAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') return null;
   if (audioCtx && audioCtx.state !== 'closed') return audioCtx;
   const Ctor = window.AudioContext || (window as any).webkitAudioContext;

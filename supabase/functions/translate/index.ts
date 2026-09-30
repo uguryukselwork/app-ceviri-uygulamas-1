@@ -1,5 +1,7 @@
 // Translates one chat message and writes the result back to public.messages.
 // Called by the app right after it inserts a message (and again for "Tekrar çevir").
+// Voice messages arrive with the translation Gemini Live already spoke; the sender passes it as `translation`
+// so the text matches what the listener heard.
 // Clients cannot write translated_text themselves; this function does it with the service role.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -120,8 +122,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   let messageId: string | undefined;
+  let spoken: string | undefined;
   try {
-    ({ message_id: messageId } = await req.json());
+    ({ message_id: messageId, translation: spoken } = await req.json());
   } catch {
     return json({ error: "Invalid JSON body" }, 400);
   }
@@ -135,7 +138,7 @@ Deno.serve(async (req) => {
   });
   const { data: msg, error: readError } = await asUser
     .from("messages")
-    .select("id, original_text, original_language, target_language, translation_status")
+    .select("id, sender_id, is_voice, original_text, original_language, target_language, translation_status")
     .eq("id", messageId)
     .maybeSingle();
   if (readError) return json({ error: readError.message }, 500);
@@ -147,7 +150,15 @@ Deno.serve(async (req) => {
     await admin.from("messages").update({ translation_status: "pending" }).eq("id", msg.id);
   }
 
-  const result = await translate(msg.original_text, msg.target_language || "en", msg.original_language);
+  // Only the sender may supply the spoken translation of their own voice message
+  let fromVoice = false;
+  if (msg.is_voice && typeof spoken === "string" && spoken.trim()) {
+    const { data: { user } } = await asUser.auth.getUser();
+    fromVoice = user?.id === msg.sender_id;
+  }
+  const result = fromVoice
+    ? { text: spoken!.trim().slice(0, 4000), detected: msg.original_language }
+    : await translate(msg.original_text, msg.target_language || "en", msg.original_language);
   const update = result
     ? { translated_text: result.text, original_language: result.detected || msg.original_language, translation_status: "completed" }
     : { translation_status: "error" };
