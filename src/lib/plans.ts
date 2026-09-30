@@ -2,7 +2,7 @@
 // Edit prices and features here; the plans page and the admin panel read from this file.
 
 export type Period = 'weekly' | 'monthly' | 'yearly';
-export type PackageId = 'vip100' | 'vip200' | 'vip300';
+export type PackageId = 'basic' | 'standard' | 'platinum';
 
 export const PERIODS: { id: Period; label: string; days: number; unit: string }[] = [
   { id: 'weekly', label: 'Haftalık', days: 7, unit: 'hafta' },
@@ -23,8 +23,8 @@ export interface Package {
 
 export const PACKAGES: Package[] = [
   {
-    id: 'vip100',
-    name: 'VIP 100',
+    id: 'basic',
+    name: 'Temel',
     monthlyMinutes: 100,
     tagline: 'Arada bir sesli konuşanlar için',
     prices: { weekly: 1.99, monthly: 5.99, yearly: 49.99 },
@@ -36,26 +36,26 @@ export const PACKAGES: Package[] = [
     ],
   },
   {
-    id: 'vip200',
-    name: 'VIP 200',
+    id: 'standard',
+    name: 'Standart',
     monthlyMinutes: 200,
     tagline: 'Her gün konuşan çiftler ve arkadaşlar için',
     prices: { weekly: 3.49, monthly: 9.99, yearly: 83.99 },
     highlight: 'En çok tercih edilen',
     features: [
-      'VIP 100\'deki her şey',
+      'Temel\'deki her şey',
       'İki kat sesli çeviri süresi',
       'Öncelikli destek',
     ],
   },
   {
-    id: 'vip300',
-    name: 'VIP 300',
+    id: 'platinum',
+    name: 'Platin',
     monthlyMinutes: 300,
     tagline: 'İş, seyahat ve uzun görüşmeler için',
     prices: { weekly: 4.99, monthly: 13.99, yearly: 116.99 },
     features: [
-      'VIP 200\'deki her şey',
+      'Standart\'daki her şey',
       'En yüksek sesli çeviri süresi',
       'Yeni özelliklere erken erişim',
       'Öncelikli destek (aynı gün yanıt)',
