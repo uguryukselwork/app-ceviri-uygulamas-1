@@ -1,24 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, Check, Gift, Loader2, PartyPopper, Clock, Sparkles, Ticket, Send, Sun, Moon, DollarSign, Zap } from 'lucide-react';
+import { Crown, Check, Loader2, PartyPopper, Clock, Sparkles, DollarSign } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { SheetHeader, Segmented, fieldClass, primaryButton, secondaryButton } from '../components/ui';
+import { SheetHeader, Segmented, primaryButton, secondaryButton } from '../components/ui';
 import {
-  fetchVipStatus, fetchMyLatestRequest, subscribeToMembership, redeemPromoCode, requestVip,
-  type VipStatus, type VipRequest, type PromoResult
+  fetchVipStatus, fetchMyLatestRequest, subscribeToMembership, requestVip,
+  type VipStatus, type VipRequest
 } from '../lib/api';
 import { PACKAGES, PERIODS, type Period, periodMinutes, yearlySaving, formatUsd, planKey, describePlan } from '../lib/plans';
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-
-const PROMO_MESSAGES: Record<Exclude<PromoResult, 'ok'>, string> = {
-  invalid: 'Bu kod geçerli değil.',
-  used_up: 'Bu kodun kullanım hakkı dolmuş.',
-  already_used: 'Bu kodu daha önce kullandın.',
-  too_many_attempts: 'Çok fazla deneme yaptın. 15 dakika sonra tekrar dene.',
-};
 
 type Notice = { tone: 'success' | 'error' | 'info'; text: string } | null;
 
@@ -27,8 +20,7 @@ export default function Plans() {
   const profile = useStore((s) => s.profile);
   const [status, setStatus] = useState<VipStatus | null>(null);
   const [request, setRequest] = useState<VipRequest | null>(null);
-  const [period, setPeriod] = useState<Period>('monthly');
-  const [switchCount, setSwitchCount] = useState(0);
+  const [period, setPeriod] = useState<Period>('yearly');
   const [dailyEnabled, setDailyEnabled] = useState(false);
   const [hourlyEnabled, setHourlyEnabled] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -53,32 +45,6 @@ export default function Plans() {
     document.addEventListener('visibilitychange', onVisible);
     return () => { unsubscribe(); document.removeEventListener('visibilitychange', onVisible); };
   }, [profile.id]);
-
-  useEffect(() => {
-    // Increment switch count when period changes
-    setSwitchCount(prev => prev + 1);
-  }, [period]);
-
-  const redeem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code.trim() || busy) return;
-    setBusy('code');
-    setNotice(null);
-    try {
-      const result = await redeemPromoCode(code);
-      if (result === 'ok') {
-        setCode('');
-        await refresh();
-        setCelebrate(true);
-      } else {
-        setNotice({ tone: 'error', text: PROMO_MESSAGES[result] });
-      }
-    } catch {
-      setNotice({ tone: 'error', text: 'Bir sorun oluştu. Bağlantını kontrol et.' });
-    } finally {
-      setBusy(null);
-    }
-  };
 
   const sendRequest = async (kind: 'gift' | 'purchase', plan: string | null) => {
     if (busy) return;
@@ -178,24 +144,26 @@ export default function Plans() {
                   <button
                     type="button"
                     onClick={() => setDailyEnabled(!dailyEnabled)}
+                    aria-pressed={dailyEnabled}
                     className={cn(
+                      'px-3 py-1 rounded-full text-sm font-medium cursor-pointer',
                       dailyEnabled
                         ? 'bg-(--theme-accent) text-(--theme-on-accent)'
                         : 'bg-(--theme-card-bg) text-(--theme-ink)'
                     )}
-                    className="px-3 py-1 rounded-full text-sm font-medium"
                   >
                     Günlük
                   </button>
                   <button
                     type="button"
                     onClick={() => setHourlyEnabled(!hourlyEnabled)}
+                    aria-pressed={hourlyEnabled}
                     className={cn(
+                      'px-3 py-1 rounded-full text-sm font-medium cursor-pointer',
                       hourlyEnabled
                         ? 'bg-(--theme-accent) text-(--theme-on-accent)'
                         : 'bg-(--theme-card-bg) text-(--theme-ink)'
                     )}
-                    className="px-3 py-1 rounded-full text-sm font-medium"
                   >
                     Saatlik
                   </button>
@@ -207,10 +175,7 @@ export default function Plans() {
                   <button
                     key={amount}
                     type="button"
-                    onClick={() => {
-                      // TODO: implement sending dollar to account
-                      alert(`${amount}$ gönderildi (henüz entegrasyon yok)`);
-                    }}
+                    onClick={() => setNotice({ tone: 'info', text: `${amount}$ bakiye yükleme yakında geliyor.` })}
                     className="flex items-center gap-2 px-3 py-2 rounded-[1.25rem] border border-(--theme-accent) bg-(--theme-card-bg) text-(--theme-ink) text-sm"
                   >
                     <DollarSign className="w-4 h-4" /> {amount}$
@@ -251,7 +216,7 @@ export default function Plans() {
               options={PERIODS.map(p => ({ id: p.id, label: p.label }))}
             />
 
-            {PACKAGES.map(pkg => {
+            {PACKAGES.filter(pkg => pkg.id !== 'free').map(pkg => {
               const key = planKey(pkg.id, period);
               const unit = PERIODS.find(p => p.id === period)!.unit;
               return (
@@ -275,7 +240,7 @@ export default function Plans() {
                       <div className="text-[13px] text-(--theme-muted)">{pkg.tagline}</div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-display font-semibold text-2xl text-(--theme-ink)">{formatUsd(pkg.basePrices[period] + switchCount)}</div>
+                      <div className="font-display font-semibold text-2xl text-(--theme-ink)">{formatUsd(pkg.basePrices[period])}</div>
                       <div className="text-[12px] font-semibold text-(--theme-muted)">/ {unit}</div>
                     </div>
                   </div>
@@ -306,7 +271,7 @@ export default function Plans() {
                     className={cn(pkg.highlight ? primaryButton : secondaryButton, 'mt-5 py-3.5')}
                   >
                     {busy === key ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {pending?.plan === key ? 'Talebin onay bekliyor' : `${formatUsd(pkg.prices[period])} ile satın al`}
+                    {pending?.plan === key ? 'Talebin onay bekliyor' : `${formatUsd(pkg.basePrices[period])} ile satın al`}
                   </button>
                 </div>
               );

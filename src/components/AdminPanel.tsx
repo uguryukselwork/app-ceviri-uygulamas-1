@@ -132,7 +132,7 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
     const plan = describePlan(req.plan);
     const days = approve ? (req.kind === 'purchase' && plan ? plan.days : giftDays[req.id] ?? 30) : null;
     return run(`req-${req.id}`, () => adminDecideRequest(pin, req.id, approve, days),
-      approve ? `${req.user_name} artık VIP (${days} gün).` : 'İstek reddedildi.');
+      approve ? `${req.user_name} artık VIP (${req.kind === 'purchase' && plan ? plan.duration : `${days} gün`}).` : 'İstek reddedildi.');
   };
 
   const copy = async (code: string) => {
@@ -301,7 +301,7 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
                             className="flex-1 py-2.5 rounded-2xl bg-emerald-600 text-white text-[14px] font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
                           >
                             {busy === `req-${req.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-                            VIP ata{req.kind === 'purchase' && plan ? ` (${plan.days} gün)` : ''}
+                            VIP ata{req.kind === 'purchase' && plan ? ` (${plan.duration})` : ''}
                           </button>
                           <button
                             type="button"

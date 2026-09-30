@@ -88,7 +88,7 @@ export const yearlySaving = (pkg: Package) =>
 
 export const formatUsd = (value: number) => `$${value.toFixed(2)}`;
 
-/** 'vip200:monthly', as stored with a purchase request */
+/** 'standard:monthly', as stored with a purchase request */
 export const planKey = (pkg: PackageId, period: Period) => `${pkg}:${period}`;
 
 export function describePlan(key: string | null) {
@@ -97,5 +97,8 @@ export function describePlan(key: string | null) {
   const pkg = PACKAGES.find(p => p.id === pkgId);
   const period = PERIODS.find(p => p.id === periodId);
   if (!pkg || !period) return null;
-  return { pkg, period, label: `${pkg.name} · ${period.label}`, price: formatUsd(pkg.basePrices[period.id]), days: period.days };
+  return { pkg, period, label: `${pkg.name} · ${period.label}`, price: formatUsd(pkg.basePrices[period.id]),
+    // Whole days for the admin RPC; hourly plans are granted one hour server-side
+    days: Math.max(1, Math.round(period.days)),
+    duration: period.id === 'hourly' ? '1 saat' : `${Math.round(period.days)} gün` };
 }
