@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Heart, Link as LinkIcon, Languages, User, Camera, Sun, Moon, UserRound, Check } from 'lucide-react';
+import { Heart, Link as LinkIcon, Languages, User, Camera, Sun, Moon, UserRound, Check, Crown } from 'lucide-react';
 import { useStore, Gender } from '../store/useStore';
 import { t } from '../lib/i18n';
 import { cn, compressImage } from '../lib/utils';
@@ -170,10 +170,19 @@ export default function Home() {
           >
             <Languages className="w-5 h-5" />
           </div>
-          <span className="font-display font-semibold text-xl text-(--theme-ink)">LiveTranslate</span>
+          {/* Hidden on the narrowest phones so the header buttons fit */}
+          <span className="hidden min-[380px]:inline font-display font-semibold text-xl text-(--theme-ink)">LiveTranslate</span>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/plans')}
+            aria-label="Üyelik planları"
+            title="Üyelik planları"
+            className={cn(headerButton, 'text-amber-500 hover:text-amber-600')}
+          >
+            <Crown className="w-5 h-5" />
+          </button>
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             aria-label={theme === 'dark' ? 'Gündüz modu' : 'Gece modu'}

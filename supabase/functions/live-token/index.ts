@@ -48,6 +48,22 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!member) return json({ error: "Not a member of this room" }, 403);
 
+  // The paid engine is for VIP members, unless the admin opened it to everyone (or switched it off)
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: access } = await admin.from("app_settings").select("value").eq("key", "vip_access").maybeSingle();
+  const mode = access?.value ?? "members";
+  if (mode === "off") return json({ error: "vip_off" }, 403);
+  if (mode !== "everyone") {
+    const { data: membership } = await admin
+      .from("memberships")
+      .select("vip_until")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!membership?.vip_until || new Date(membership.vip_until) <= new Date()) {
+      return json({ error: "vip_required" }, 403);
+    }
+  }
+
   const config = {
     responseModalities: [Modality.AUDIO],
     translationConfig: { targetLanguageCode: target, echoTargetLanguage: false },

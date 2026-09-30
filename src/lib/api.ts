@@ -112,22 +112,135 @@ export async function sendMessage(msg: {
   return data as MessageType;
 }
 
-/** Voice translation mode chosen by the admin; 'free' when unset or unreadable */
-export async function fetchVoiceMode(): Promise<'free' | 'paid'> {
-  const { data } = await supabase.from('app_settings').select('value').eq('key', 'voice_mode').maybeSingle();
-  return data?.value === 'paid' ? 'paid' : 'free';
+// ---------------------------------------------------------------------------
+// VIP membership. VIP unlocks the paid voice engine; the live-token edge function enforces it.
+
+/** 'members': VIP members only; 'everyone': VIP is free for all; 'off': free engine only */
+export type VipAccess = 'members' | 'everyone' | 'off';
+
+export interface VipStatus {
+  access: VipAccess;
+  /** End of my own VIP membership, if any */
+  vipUntil: string | null;
+  /** Whether I may start the VIP engine right now */
+  canUseVip: boolean;
 }
+
+export async function fetchVipStatus(userId: string): Promise<VipStatus> {
+  const [{ data: setting }, { data: membership }] = await Promise.all([
+    supabase.from('app_settings').select('value').eq('key', 'vip_access').maybeSingle(),
+    supabase.from('memberships').select('vip_until').eq('user_id', userId).maybeSingle(),
+  ]);
+  const access: VipAccess = setting?.value === 'everyone' || setting?.value === 'off' ? setting.value : 'members';
+  const vipUntil = membership?.vip_until && new Date(membership.vip_until) > new Date() ? membership.vip_until : null;
+  return { access, vipUntil, canUseVip: access === 'everyone' || (access === 'members' && !!vipUntil) };
+}
+
+/** Fires when the admin grants me VIP (or my latest request is decided) */
+export function subscribeToMembership(userId: string, onChange: () => void): () => void {
+  const channel = supabase
+    .channel(`membership:${userId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'memberships', filter: `user_id=eq.${userId}` }, onChange)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vip_requests', filter: `user_id=eq.${userId}` }, onChange)
+    .subscribe();
+  return () => { void supabase.removeChannel(channel); };
+}
+
+export type PromoResult = 'ok' | 'invalid' | 'used_up' | 'already_used' | 'too_many_attempts';
+
+export async function redeemPromoCode(code: string): Promise<PromoResult> {
+  const { data, error } = await supabase.rpc('redeem_promo_code', { p_code: code });
+  if (error) {
+    if (error.message.includes('too_many_attempts')) return 'too_many_attempts';
+    throw error;
+  }
+  return (data?.status ?? 'invalid') as PromoResult;
+}
+
+export interface VipRequest {
+  id: string;
+  user_id: string;
+  user_name: string;
+  kind: 'gift' | 'purchase';
+  plan: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  decided_at: string | null;
+}
+
+/** A gift ("Hediyemiz var") or plan purchase request for the admin to approve */
+export async function requestVip(kind: 'gift' | 'purchase', plan: string | null, name: string): Promise<'sent' | 'already_pending'> {
+  const { data, error } = await supabase.rpc('request_vip', { p_kind: kind, p_plan: plan, p_name: name });
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchMyLatestRequest(userId: string): Promise<VipRequest | null> {
+  const { data } = await supabase
+    .from('vip_requests')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data as VipRequest | null;
+}
+
+// Admin panel. Every call carries the PIN; the database checks it and counts wrong ones.
+
+const adminError = (error: { message: string }) =>
+  new Error(error.message.includes('too_many_attempts') ? 'too_many_attempts' : error.message);
 
 /** Checks the admin PIN on the server. Throws 'too_many_attempts' after repeated wrong PINs. */
 export async function adminCheckPin(pin: string): Promise<boolean> {
   const { data, error } = await supabase.rpc('admin_check_pin', { p_pin: pin });
-  if (error) throw new Error(error.message.includes('too_many_attempts') ? 'too_many_attempts' : error.message);
+  if (error) throw adminError(error);
   return data === true;
 }
 
-export async function adminSetVoiceMode(pin: string, mode: 'free' | 'paid'): Promise<boolean> {
-  const { data, error } = await supabase.rpc('admin_set_voice_mode', { p_pin: pin, p_mode: mode });
-  if (error) throw new Error(error.message.includes('too_many_attempts') ? 'too_many_attempts' : error.message);
+export interface PromoCode {
+  code: string;
+  days: number;
+  max_uses: number;
+  uses: number;
+  created_at: string;
+}
+
+export interface AdminOverview {
+  vip_access: VipAccess;
+  vip_members: number;
+  requests: VipRequest[];
+  promos: PromoCode[];
+}
+
+/** null when the PIN is wrong */
+export async function adminOverview(pin: string): Promise<AdminOverview | null> {
+  const { data, error } = await supabase.rpc('admin_overview', { p_pin: pin });
+  if (error) throw adminError(error);
+  return data as AdminOverview | null;
+}
+
+export async function adminSetVipAccess(pin: string, value: VipAccess): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_set_vip_access', { p_pin: pin, p_value: value });
+  if (error) throw adminError(error);
+  return data === true;
+}
+
+export async function adminCreatePromo(pin: string, code: string, days: number, maxUses: number): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_create_promo', { p_pin: pin, p_code: code, p_days: days, p_max_uses: maxUses });
+  if (error) throw adminError(error);
+  return data === true;
+}
+
+export async function adminDeletePromo(pin: string, code: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_delete_promo', { p_pin: pin, p_code: code });
+  if (error) throw adminError(error);
+  return data === true;
+}
+
+export async function adminDecideRequest(pin: string, id: string, approve: boolean, days: number | null): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_decide_request', { p_pin: pin, p_id: id, p_approve: approve, p_days: days });
+  if (error) throw adminError(error);
   return data === true;
 }
 

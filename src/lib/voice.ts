@@ -48,7 +48,8 @@ export class PcmPlayer {
 
   /** True while partner audio is (about to be) heard, plus a short tail for room echo */
   get isPlaying() {
-    return performance.now() < this.endsAt + 350;
+    // Phone speakers and the room keep sounding a while after the buffer ends
+    return performance.now() < this.endsAt + 1000;
   }
 
   reset() {
@@ -94,12 +95,30 @@ class Downsampler {
 
 export type VoiceState = 'connecting' | 'live' | 'error';
 
+const words = (text: string) =>
+  text.toLocaleLowerCase().replace(/[\p{P}\p{S}]/gu, ' ').split(/\s+/).filter(Boolean);
+
+/**
+ * True when what my mic picked up is mostly the partner's translation that my speaker just played.
+ * Without this the two phones translate each other's speaker output back and forth forever.
+ */
+export function isEcho(said: string, recentlyHeard: string) {
+  const saidWords = words(said);
+  if (!saidWords.length) return false;
+  const heard = new Set(words(recentlyHeard));
+  if (!heard.size) return false;
+  const matched = saidWords.filter(w => heard.has(w)).length;
+  return matched / saidWords.length >= 0.6;
+}
+
 export interface VoiceOptions {
   roomId: string;
   /** Language my speech is translated into (the partner's) */
   targetLanguage: string;
   /** Mic audio is held back while this returns true, so the partner's voice from my speaker is not re-translated */
   isHearingPartner: () => boolean;
+  /** What the partner said lately, in my language; a sentence of mine that repeats it is speaker echo */
+  recentlyHeard: () => string;
   onState: (state: VoiceState, error?: string) => void;
   /** Translated audio to relay to the partner */
   onAudio: (b64: string) => void;
@@ -118,6 +137,8 @@ export class VoiceTranslator implements VoiceEngine {
   private original = '';
   private translated = '';
   private detected?: string;
+  /** The current sentence is speaker echo: nothing of it is relayed or saved */
+  private echo = false;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private relay: Uint8Array[] = [];
   private relayTimer: ReturnType<typeof setInterval> | null = null;
@@ -174,7 +195,14 @@ export class VoiceTranslator implements VoiceEngine {
     const { data, error } = await supabase.functions.invoke('live-token', {
       body: { room_id: this.opts.roomId, target_language: this.opts.targetLanguage },
     });
-    if (error || !data?.token) throw new Error('Sesli çeviri başlatılamadı');
+    if (error || !data?.token) {
+      const reason = await (error as { context?: Response } | null)?.context?.json?.().then((b: { error?: string }) => b.error).catch(() => undefined);
+      throw new Error(
+        reason === 'vip_required' ? 'VIP üyelik gerekli'
+        : reason === 'vip_off' ? 'VIP sesli çeviri şu an kapalı'
+        : 'Sesli çeviri başlatılamadı'
+      );
+    }
     if (!this.active) return;
 
     const { GoogleGenAI } = await import('@google/genai');
@@ -190,21 +218,27 @@ export class VoiceTranslator implements VoiceEngine {
         onmessage: (msg) => {
           const c = msg.serverContent;
           if (!c) return;
-          for (const part of c.modelTurn?.parts ?? []) {
-            if (part.inlineData?.data) this.relay.push(fromBase64(part.inlineData.data));
-          }
           let changed = false;
           if (c.inputTranscription?.text) {
             this.original += c.inputTranscription.text;
             if (c.inputTranscription.languageCode) this.detected = c.inputTranscription.languageCode;
+            if (!this.echo && isEcho(this.original, this.opts.recentlyHeard())) {
+              this.echo = true;
+              this.relay = [];
+            }
             changed = true;
+          }
+          if (!this.echo) {
+            for (const part of c.modelTurn?.parts ?? []) {
+              if (part.inlineData?.data) this.relay.push(fromBase64(part.inlineData.data));
+            }
           }
           if (c.outputTranscription?.text) {
             this.translated += c.outputTranscription.text;
             changed = true;
           }
           if (changed) {
-            this.opts.onCaption(this.translated.trim(), this.original.trim());
+            if (!this.echo) this.opts.onCaption(this.translated.trim(), this.original.trim());
             this.scheduleSentenceEnd();
           }
         },
@@ -241,14 +275,20 @@ export class VoiceTranslator implements VoiceEngine {
     this.idleTimer = null;
     const original = this.original.trim();
     const translated = this.translated.trim();
+    const echo = this.echo;
+    if (!echo) this.flushRelay(true);
     this.original = '';
     this.translated = '';
+    this.echo = false;
+    this.relay = [];
     this.opts.onCaption('', '');
-    if (original) this.opts.onSentence(original, translated, this.detected);
+    if (original && !echo) this.opts.onSentence(original, translated, this.detected);
   }
 
-  private flushRelay() {
-    if (!this.relay.length) return;
+  /** Audio waits until the transcript shows the sentence is not echo */
+  private flushRelay(force = false) {
+    if (!this.relay.length || this.echo) return;
+    if (!force && !this.original.trim()) return;
     const total = this.relay.reduce((n, b) => n + b.length, 0);
     const merged = new Uint8Array(total);
     let offset = 0;
@@ -273,7 +313,6 @@ export class VoiceTranslator implements VoiceEngine {
   stop() {
     if (!this.active && !this.stream && !this.session) return;
     this.active = false;
-    this.flushRelay();
     if (this.relayTimer) clearInterval(this.relayTimer);
     this.relayTimer = null;
     if (this.original.trim()) this.finishSentence();
@@ -318,6 +357,8 @@ export const isFreeVoiceSupported = () => typeof window !== 'undefined' && !!rec
 export interface BrowserVoiceOptions {
   /** My language: what the recognizer listens for */
   language: string;
+  /** What the partner said lately, in my language (see isEcho) */
+  recentlyHeard: () => string;
   onState: (state: VoiceState, error?: string) => void;
   /** What I am saying right now, before it is final */
   onCaption: (original: string) => void;
@@ -357,7 +398,7 @@ export class BrowserVoiceTranslator implements VoiceEngine {
         if (!text) continue;
         if (e.results[i].isFinal) {
           this.opts.onCaption('');
-          this.opts.onSentence(text);
+          if (!this.held && !isEcho(text, this.opts.recentlyHeard())) this.opts.onSentence(text);
         } else {
           interim += (interim ? ' ' : '') + text;
         }

@@ -5,6 +5,7 @@ import Profile from './pages/Profile';
 import CreateRoom from './pages/CreateRoom';
 import JoinRoom from './pages/JoinRoom';
 import Room from './pages/Room';
+import Plans from './pages/Plans';
 import { useStore } from './store/useStore';
 import SecurityLockModal from './components/SecurityLockModal';
 import { SignInOptions } from './components/AccountSheet';
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="/create-room" element={<RequireAuth><CreateRoom /></RequireAuth>} />
             <Route path="/join-room" element={<RequireAuth><JoinRoom /></RequireAuth>} />
             <Route path="/room/:roomCode" element={<RequireAuth><Room /></RequireAuth>} />
+            <Route path="/plans" element={<RequireAuth><Plans /></RequireAuth>} />
           </Routes>
 
           {/* Full-Screen App Start Lock */}

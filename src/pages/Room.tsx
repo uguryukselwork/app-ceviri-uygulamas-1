@@ -5,7 +5,8 @@ import RoomHeader from '../components/RoomHeader';
 import ChatInput from '../components/ChatInput';
 import ChatMessage, { MessageType, readableText } from '../components/ChatMessage';
 import VoiceCallBar from '../components/VoiceCallBar';
-import { joinLiveChannel, type LiveChannel } from '../lib/live';
+import VoiceModeSheet from '../components/VoiceModeSheet';
+import { joinLiveChannel, type LiveChannel, type CallMember } from '../lib/live';
 import {
   VoiceTranslator, BrowserVoiceTranslator, PcmPlayer, speak,
   type VoiceState, type VoiceEngine, type VoiceMode
@@ -22,7 +23,7 @@ import SecurityLockModal from '../components/SecurityLockModal';
 import { primaryButton } from '../components/ui';
 import {
   findRoom, upsertParticipant, fetchParticipants, fetchMessages, sendMessage,
-  requestTranslation, markMessagesRead, subscribeToRoom, fetchVoiceMode, type Participant
+  requestTranslation, markMessagesRead, subscribeToRoom, fetchVipStatus, type Participant, type VipStatus
 } from '../lib/api';
 
 export default function Room() {
@@ -56,7 +57,9 @@ export default function Room() {
 
   // Typing indicator and live voice translation (see lib/live.ts, lib/voice.ts)
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [callMembers, setCallMembers] = useState<string[]>([]);
+  const [callMembers, setCallMembers] = useState<CallMember[]>([]);
+  const [showVoiceModes, setShowVoiceModes] = useState(false);
+  const [vipStatus, setVipStatus] = useState<VipStatus | null>(null);
   const [inCall, setInCall] = useState(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('connecting');
   const [muted, setMuted] = useState(false);
@@ -271,7 +274,9 @@ export default function Room() {
         if (inCallRef.current) playerRef.current.play(data);
       },
       onCaption: (_from, text) => {
-        if (inCallRef.current) setPartnerCaption(text);
+        if (!inCallRef.current) return;
+        setPartnerCaption(text);
+        rememberHeard(text);
       },
     });
     liveRef.current = live;
@@ -296,16 +301,33 @@ export default function Room() {
     setTypingUsers(prev => prev.filter(id => id !== last.sender_id));
   }, [messages]);
 
-  // Admin's choice (hidden panel on the home screen); read before each call so a change applies to the next one
-  const voiceModeRef = useRef<VoiceMode>('free');
-  const refreshVoiceMode = () => { fetchVoiceMode().then(m => { voiceModeRef.current = m; }).catch(() => {}); };
-  useEffect(refreshVoiceMode, [roomId]);
+  // What the partner said lately (in my language). A sentence of mine that repeats it is my speaker's echo,
+  // which would otherwise bounce between the two phones forever.
+  const heardLog = useRef<{ text: string; at: number }[]>([]);
+  const rememberHeard = (text: string) => {
+    if (!text.trim()) return;
+    const now = Date.now();
+    heardLog.current = [...heardLog.current.filter(h => now - h.at < 15000), { text, at: now }];
+  };
+  const recentlyHeard = () => {
+    const now = Date.now();
+    return heardLog.current.filter(h => now - h.at < 15000).map(h => h.text).join(' ');
+  };
 
-  // Free mode: the partner's voice sentences arrive as messages and are read aloud here, one after another
+  // VIP membership decides whether the VIP (Gemini Live) option can be picked
+  const refreshVipStatus = () => { fetchVipStatus(profile.id).then(setVipStatus).catch(() => {}); };
+  useEffect(refreshVipStatus, [profile.id]);
+
+  const partnerMember = callMembers.find(m => m.userId !== profile.id);
+  const partnerEngineRef = useRef<'free' | 'paid'>('free');
+  partnerEngineRef.current = partnerMember?.engine ?? 'free';
+
+  // A partner on the free engine sends text only: read their voice sentences aloud here, one after another.
+  // (A partner on VIP sends translated audio, which the player handles.)
   const spokenIds = useRef(new Set<string>());
   const speechQueue = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
-    if (!inCall || voiceModeRef.current !== 'free') return;
+    if (!inCall || partnerEngineRef.current !== 'free') return;
     for (const m of messages) {
       if (!m.is_voice || m.sender_id === profile.id || m.translation_status !== 'completed' || spokenIds.current.has(m.id)) continue;
       spokenIds.current.add(m.id);
@@ -314,13 +336,19 @@ export default function Room() {
         if (!inCallRef.current) return;
         const engine = translatorRef.current;
         if (engine instanceof BrowserVoiceTranslator) engine.setHeld(true);
+        rememberHeard(text);
         setPartnerCaption(text);
         await speak(text, profile.language);
         setPartnerCaption('');
         if (engine instanceof BrowserVoiceTranslator) engine.setHeld(false);
       });
     }
-  }, [messages, inCall]);
+  }, [messages, inCall, partnerMember?.engine]);
+
+  const openVoiceModes = () => {
+    refreshVipStatus();
+    setShowVoiceModes(true);
+  };
 
   const onEngineState = (state: VoiceState, error?: string) => {
     setVoiceState(state);
@@ -331,20 +359,23 @@ export default function Room() {
   };
 
   // Called straight from a tap: browsers only allow the microphone and sound to start inside one
-  const startCall = () => {
+  const startCall = (mode: VoiceMode) => {
+    setShowVoiceModes(false);
     if (!roomId || translatorRef.current) return;
     setVoiceError(null);
     setMuted(false);
     setInCall(true);
-    liveRef.current?.setInCall(true);
+    liveRef.current?.setInCall(true, mode);
     // Only sentences spoken from now on are read aloud
     spokenIds.current = new Set(messages.map(m => m.id));
+    heardLog.current = [];
 
-    const engine: VoiceEngine = voiceModeRef.current === 'paid'
+    const engine: VoiceEngine = mode === 'paid'
       ? new VoiceTranslator({
           roomId,
           targetLanguage: targetLanguage(),
           isHearingPartner: () => playerRef.current.isPlaying,
+          recentlyHeard,
           onState: onEngineState,
           onAudio: (data) => liveRef.current?.sendAudio(data),
           onCaption: (translated, original) => {
@@ -357,6 +388,7 @@ export default function Room() {
         })
       : new BrowserVoiceTranslator({
           language: profile.language,
+          recentlyHeard,
           onState: onEngineState,
           onCaption: setMyCaption,
           onSentence: (original) => { void postMessageRef.current(original, { is_voice: true }); },
@@ -373,7 +405,6 @@ export default function Room() {
     playerRef.current.reset();
     setMyCaption('');
     setPartnerCaption('');
-    refreshVoiceMode();
   };
 
   const toggleMute = () => {
@@ -421,7 +452,7 @@ export default function Room() {
         onOpenSettings={() => setShowSettings(true)}
         onOpenParticipants={() => setShowParticipants(true)}
         partnerTyping={!!partner && typingUsers.includes(partner.user_id)}
-        onStartCall={partner && isConnected ? startCall : undefined}
+        onStartCall={partner && isConnected ? openVoiceModes : undefined}
         inCall={inCall}
       />
 
@@ -505,12 +536,12 @@ export default function Room() {
         lang={profile.language}
         partnerName={partner?.name || t('room.waiting_partner', profile.language)}
         inCall={inCall}
-        partnerInCall={!!partner && callMembers.includes(partner.user_id)}
+        partnerInCall={!!partner && callMembers.some(m => m.userId === partner.user_id)}
         state={voiceState}
         muted={muted}
         myCaption={myCaption}
         partnerCaption={partnerCaption}
-        onJoin={startCall}
+        onJoin={openVoiceModes}
         onToggleMute={toggleMute}
         onEnd={endCall}
       />
@@ -709,6 +740,14 @@ export default function Room() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <VoiceModeSheet
+        open={showVoiceModes}
+        status={vipStatus}
+        onClose={() => setShowVoiceModes(false)}
+        onStart={startCall}
+        onOpenPlans={() => { setShowVoiceModes(false); navigate('/plans'); }}
+      />
 
       <SettingsSheet
         open={showSettings}
