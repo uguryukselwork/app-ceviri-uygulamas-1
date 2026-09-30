@@ -124,16 +124,21 @@ export interface VipStatus {
   vipUntil: string | null;
   /** Whether I may start the VIP engine right now */
   canUseVip: boolean;
+  /** Account balance in US dollars, topped up by the admin */
+  balanceUsd: number;
 }
 
 export async function fetchVipStatus(userId: string): Promise<VipStatus> {
   const [{ data: setting }, { data: membership }] = await Promise.all([
     supabase.from('app_settings').select('value').eq('key', 'vip_access').maybeSingle(),
-    supabase.from('memberships').select('vip_until').eq('user_id', userId).maybeSingle(),
+    supabase.from('memberships').select('vip_until, balance_usd').eq('user_id', userId).maybeSingle(),
   ]);
   const access: VipAccess = setting?.value === 'everyone' || setting?.value === 'off' ? setting.value : 'members';
   const vipUntil = membership?.vip_until && new Date(membership.vip_until) > new Date() ? membership.vip_until : null;
-  return { access, vipUntil, canUseVip: access === 'everyone' || (access === 'members' && !!vipUntil) };
+  return {
+    access, vipUntil, canUseVip: access === 'everyone' || (access === 'members' && !!vipUntil),
+    balanceUsd: Number(membership?.balance_usd ?? 0),
+  };
 }
 
 /** Fires when the admin grants me VIP (or my latest request is decided) */
@@ -206,11 +211,20 @@ export interface PromoCode {
   created_at: string;
 }
 
+export interface AdminUser {
+  user_id: string;
+  name: string;
+  last_seen: string;
+  vip_until: string | null;
+  balance_usd: number;
+}
+
 export interface AdminOverview {
   vip_access: VipAccess;
   vip_members: number;
   requests: VipRequest[];
   promos: PromoCode[];
+  users: AdminUser[];
 }
 
 /** null when the PIN is wrong */
@@ -240,6 +254,20 @@ export async function adminDeletePromo(pin: string, code: string): Promise<boole
 
 export async function adminDecideRequest(pin: string, id: string, approve: boolean, days: number | null): Promise<boolean> {
   const { data, error } = await supabase.rpc('admin_decide_request', { p_pin: pin, p_id: id, p_approve: approve, p_days: days });
+  if (error) throw adminError(error);
+  return data === true;
+}
+
+/** Adds dollars to a user's balance (a negative amount takes them back) */
+export async function adminAddBalance(pin: string, userId: string, amount: number): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_add_balance', { p_pin: pin, p_user: userId, p_amount: amount });
+  if (error) throw adminError(error);
+  return data === true;
+}
+
+/** Sends hours of VIP usage to a user */
+export async function adminGrantHours(pin: string, userId: string, hours: number): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_grant_hours', { p_pin: pin, p_user: userId, p_hours: hours });
   if (error) throw adminError(error);
   return data === true;
 }

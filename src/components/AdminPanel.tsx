@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ShieldCheck, Check, Loader2, Crown, Users, Ban, Gift, ShoppingBag, X, Trash2, Copy, Wand2, RefreshCw, Ticket
+  ShieldCheck, Check, Loader2, Crown, Users, Ban, Gift, ShoppingBag, X, Trash2, Copy, Wand2, RefreshCw, Ticket, Search, Wallet, Clock, ChevronDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fieldClass, primaryButton, IconTile, softIconButton } from './ui';
 import {
-  adminCheckPin, adminOverview, adminSetVipAccess, adminCreatePromo, adminDeletePromo, adminDecideRequest,
-  type AdminOverview, type VipAccess, type VipRequest
+  adminCheckPin, adminOverview, adminSetVipAccess, adminCreatePromo, adminDeletePromo, adminDecideRequest, adminAddBalance, adminGrantHours,
+  type AdminOverview, type AdminUser, type VipAccess, type VipRequest
 } from '../lib/api';
 import { describePlan } from '../lib/plans';
 
@@ -41,6 +41,16 @@ const GIFT_DURATIONS = [
   { days: 365, label: '1 yıl' },
 ];
 
+const DOLLAR_AMOUNTS = [5, 10, 20, 50];
+const USAGE_HOURS = [
+  { hours: 1, label: '1 saat' },
+  { hours: 2, label: '2 saat' },
+  { hours: 5, label: '5 saat' },
+  { hours: 24, label: '1 gün' },
+];
+
+const formatUsd = (value: number) => `$${Number(value).toFixed(2)}`;
+
 const randomCode = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return 'VIP' + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -63,6 +73,10 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
   const [newDays, setNewDays] = useState(30);
   const [newUses, setNewUses] = useState(10);
   const [copied, setCopied] = useState<string | null>(null);
+  const [userQuery, setUserQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [customAmount, setCustomAmount] = useState('');
+  const [customHours, setCustomHours] = useState('');
 
   // Forget the PIN whenever the panel closes
   useEffect(() => {
@@ -71,6 +85,8 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
     setOverview(null);
     setError(null);
     setNotice(null);
+    setSelectedUser(null);
+    setUserQuery('');
   }, [open]);
 
   const explain = (err: unknown) => {
@@ -78,6 +94,8 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
     if (message === 'too_many_attempts') return 'Çok fazla yanlış deneme. 15 dakika sonra tekrar dene.';
     if (message.includes('code_exists')) return 'Bu kod zaten var. Başka bir kod dene.';
     if (message.includes('request_not_pending')) return 'Bu istek zaten yanıtlanmış.';
+    if (message.includes('invalid_amount')) return 'Geçerli bir tutar gir (en fazla 10.000$).';
+    if (message.includes('invalid_hours')) return 'Geçerli bir süre gir (1–8760 saat).';
     return 'Bir sorun oluştu. Bağlantını kontrol et.';
   };
 
@@ -135,6 +153,16 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
       approve ? `${req.user_name} artık VIP (${req.kind === 'purchase' && plan ? plan.duration : `${days} gün`}).` : 'İstek reddedildi.');
   };
 
+  const sendDollars = (user: AdminUser, amount: number) =>
+    run(`usd-${user.user_id}`, () => adminAddBalance(pin, user.user_id, amount),
+      amount > 0
+        ? `${user.name} hesabına ${formatUsd(amount)} gönderildi.`
+        : `${user.name} hesabından ${formatUsd(-amount)} geri alındı.`);
+
+  const sendHours = (user: AdminUser, hours: number) =>
+    run(`hours-${user.user_id}`, () => adminGrantHours(pin, user.user_id, hours),
+      `${user.name} kullanıcısına ${hours} saat VIP kullanım hakkı gönderildi.`);
+
   const copy = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
@@ -145,6 +173,10 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
 
   const pending = overview?.requests.filter(r => r.status === 'pending') ?? [];
   const decided = overview?.requests.filter(r => r.status !== 'pending').slice(0, 8) ?? [];
+  const query = userQuery.trim().toLocaleLowerCase('tr-TR');
+  const users = (overview?.users ?? [])
+    .filter(u => !query || u.name.toLocaleLowerCase('tr-TR').includes(query) || u.user_id.startsWith(query))
+    .slice(0, 30);
 
   return (
     <AnimatePresence>
@@ -330,6 +362,135 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
                       </ul>
                     </details>
                   )}
+                </section>
+
+                {/* Users: send balance and usage time */}
+                <section className="space-y-2.5">
+                  <h3 className={sectionTitle}>Kullanıcılar ({overview.users.length})</h3>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-(--theme-muted)" />
+                    <input
+                      type="search"
+                      value={userQuery}
+                      onChange={(e) => setUserQuery(e.target.value)}
+                      placeholder="İsim ile ara"
+                      aria-label="Kullanıcı ara"
+                      className={cn(fieldClass, 'pl-10 py-2.5')}
+                    />
+                  </div>
+                  {users.length === 0 && <p className="text-[13px] text-(--theme-muted) px-1">Kullanıcı bulunamadı.</p>}
+                  <ul className="space-y-2">
+                    {users.map(u => {
+                      const expanded = selectedUser === u.user_id;
+                      const amount = Number(customAmount.replace(',', '.'));
+                      const hours = Number(customHours);
+                      return (
+                        <li key={u.user_id} className={cn('rounded-3xl border-2 bg-(--theme-card-bg)', expanded ? 'border-(--theme-accent)' : 'border-(--theme-border)')}>
+                          <button
+                            type="button"
+                            aria-expanded={expanded}
+                            onClick={() => { setSelectedUser(expanded ? null : u.user_id); setCustomAmount(''); setCustomHours(''); }}
+                            className="w-full flex items-center gap-3 px-3.5 py-3 text-left cursor-pointer"
+                          >
+                            <span className={cn('w-9 h-9 shrink-0 rounded-2xl flex items-center justify-center', u.vip_until ? 'bg-amber-500/15 text-amber-600' : 'bg-(--theme-subtle-bg) text-(--theme-muted)')}>
+                              <Crown className="w-4 h-4" />
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block font-bold text-[14.5px] text-(--theme-ink) truncate">
+                                {u.name} <span className="font-normal text-[11.5px] text-(--theme-muted)">#{u.user_id.slice(0, 6)}</span>
+                              </span>
+                              <span className="block text-[12px] text-(--theme-muted)">
+                                {u.vip_until ? `VIP · ${formatDate(u.vip_until)} kadar` : 'Ücretsiz'} · Bakiye {formatUsd(u.balance_usd)}
+                              </span>
+                            </span>
+                            <ChevronDown className={cn('w-4 h-4 shrink-0 text-(--theme-muted) transition-transform', expanded && 'rotate-180')} />
+                          </button>
+
+                          {expanded && (
+                            <div className="px-3.5 pb-3.5 space-y-4">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-(--theme-muted)">
+                                  <Wallet className="w-3.5 h-3.5" /> Bakiyeye dolar gönder
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {DOLLAR_AMOUNTS.map(a => (
+                                    <button
+                                      key={a}
+                                      type="button"
+                                      disabled={!!busy}
+                                      onClick={() => sendDollars(u, a)}
+                                      className="px-3.5 py-2 rounded-2xl bg-(--theme-accent-light) text-(--theme-accent) text-[13.5px] font-bold hover:bg-(--theme-accent) hover:text-(--theme-on-accent) disabled:opacity-50 cursor-pointer"
+                                    >
+                                      +{a}$
+                                    </button>
+                                  ))}
+                                </div>
+                                <form
+                                  className="flex gap-2"
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    if (amount) void sendDollars(u, amount).then(() => setCustomAmount(''));
+                                  }}
+                                >
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={customAmount}
+                                    onChange={(e) => setCustomAmount(e.target.value.replace(/[^0-9.,-]/g, '').slice(0, 9))}
+                                    placeholder="Tutar ($) · geri almak için -5"
+                                    aria-label="Özel tutar"
+                                    className={cn(fieldClass, 'py-2.5 flex-1 min-w-0')}
+                                  />
+                                  <button type="submit" disabled={!amount || !!busy} className="px-4 rounded-2xl bg-(--theme-accent) text-(--theme-on-accent) text-[13.5px] font-bold disabled:opacity-50 cursor-pointer">
+                                    {busy === `usd-${u.user_id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Gönder'}
+                                  </button>
+                                </form>
+                              </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-(--theme-muted)">
+                                  <Clock className="w-3.5 h-3.5" /> VIP kullanım hakkı gönder
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {USAGE_HOURS.map(h => (
+                                    <button
+                                      key={h.hours}
+                                      type="button"
+                                      disabled={!!busy}
+                                      onClick={() => sendHours(u, h.hours)}
+                                      className="px-3.5 py-2 rounded-2xl bg-amber-500/15 text-amber-700 text-[13.5px] font-bold hover:bg-amber-500 hover:text-white disabled:opacity-50 cursor-pointer"
+                                    >
+                                      +{h.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <form
+                                  className="flex gap-2"
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    if (hours) void sendHours(u, hours).then(() => setCustomHours(''));
+                                  }}
+                                >
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={customHours}
+                                    onChange={(e) => setCustomHours(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                    placeholder="Saat sayısı (örn. 3)"
+                                    aria-label="Özel süre (saat)"
+                                    className={cn(fieldClass, 'py-2.5 flex-1 min-w-0')}
+                                  />
+                                  <button type="submit" disabled={!hours || !!busy} className="px-4 rounded-2xl bg-amber-500 text-white text-[13.5px] font-bold disabled:opacity-50 cursor-pointer">
+                                    {busy === `hours-${u.user_id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Gönder'}
+                                  </button>
+                                </form>
+                              </div>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </section>
 
                 {/* Promo codes */}

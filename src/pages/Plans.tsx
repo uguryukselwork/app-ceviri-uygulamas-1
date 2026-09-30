@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, Check, Loader2, PartyPopper, Clock, Sparkles, DollarSign } from 'lucide-react';
+import { Crown, Check, Loader2, PartyPopper, Clock, Sparkles, Wallet } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { SheetHeader, Segmented, primaryButton, secondaryButton } from '../components/ui';
@@ -11,7 +11,7 @@ import {
 } from '../lib/api';
 import { PACKAGES, PERIODS, type Period, periodMinutes, yearlySaving, formatUsd, planKey, describePlan } from '../lib/plans';
 
-const formatDate = (iso: string) => new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+const formatDate = (iso: string) => new Date(iso).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 type Notice = { tone: 'success' | 'error' | 'info'; text: string } | null;
 
@@ -21,8 +21,6 @@ export default function Plans() {
   const [status, setStatus] = useState<VipStatus | null>(null);
   const [request, setRequest] = useState<VipRequest | null>(null);
   const [period, setPeriod] = useState<Period>('yearly');
-  const [dailyEnabled, setDailyEnabled] = useState(false);
-  const [hourlyEnabled, setHourlyEnabled] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [celebrate, setCelebrate] = useState(false);
@@ -103,6 +101,14 @@ export default function Plans() {
                 </div>
               </div>
             )}
+            {status && (
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-(--theme-subtle-bg) px-4 py-3">
+                <span className="flex items-center gap-2 text-[14px] font-semibold text-(--theme-ink)">
+                  <Wallet className="w-4 h-4 text-(--theme-accent)" /> Bakiyen
+                </span>
+                <span className="font-display font-semibold text-xl text-(--theme-ink)">{formatUsd(status.balanceUsd)}</span>
+              </div>
+            )}
             {pending && (
               <div className="mt-4 flex items-center gap-2 rounded-2xl bg-(--theme-subtle-bg) px-3 py-2 text-[13px] font-semibold text-(--theme-ink)">
                 <Clock className="w-4 h-4 shrink-0 text-(--theme-accent)" />
@@ -134,60 +140,6 @@ export default function Plans() {
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Usage rights */}
-          <div className="rounded-[1.75rem] border-2 border-dashed border-(--theme-accent) bg-(--theme-accent-light) overflow-hidden">
-            <div className="px-4 py-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="block font-bold text-[15px] text-(--theme-ink)">Kullanım hakkı</span>
-                <div className="flex items-center gap-2 text-[13px] text-(--theme-muted)">
-                  <button
-                    type="button"
-                    onClick={() => setDailyEnabled(!dailyEnabled)}
-                    aria-pressed={dailyEnabled}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-sm font-medium cursor-pointer',
-                      dailyEnabled
-                        ? 'bg-(--theme-accent) text-(--theme-on-accent)'
-                        : 'bg-(--theme-card-bg) text-(--theme-ink)'
-                    )}
-                  >
-                    Günlük
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHourlyEnabled(!hourlyEnabled)}
-                    aria-pressed={hourlyEnabled}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-sm font-medium cursor-pointer',
-                      hourlyEnabled
-                        ? 'bg-(--theme-accent) text-(--theme-on-accent)'
-                        : 'bg-(--theme-card-bg) text-(--theme-ink)'
-                    )}
-                  >
-                    Saatlik
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {[5, 10, 20].map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => setNotice({ tone: 'info', text: `${amount}$ bakiye yükleme yakında geliyor.` })}
-                    className="flex items-center gap-2 px-3 py-2 rounded-[1.25rem] border border-(--theme-accent) bg-(--theme-card-bg) text-(--theme-ink) text-sm"
-                  >
-                    <DollarSign className="w-4 h-4" /> {amount}$
-                  </button>
-                ))}
-              </div>
-
-              <div className="text-[12px] text-(--theme-muted)">
-                Günlük ve saatlik seçenekleri VIP üyelik dışında kullanılabilecek ücretsiz haklar.
-              </div>
-            </div>
-          </div>
 
           {notice && (
             <p

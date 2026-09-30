@@ -1,12 +1,10 @@
 // VIP membership plans. Prices are shown in US dollars (also in Turkey).
 // Edit prices and features here; the plans page and the admin panel read from this file.
 
-export type Period = 'daily' | 'hourly' | 'weekly' | 'monthly' | 'yearly';
+export type Period = 'weekly' | 'monthly' | 'yearly';
 export type PackageId = 'free' | 'standard' | 'premium';
 
 export const PERIODS: { id: Period; label: string; days: number; unit: string }[] = [
-  { id: 'daily', label: 'Günlük', days: 1, unit: 'gün' },
-  { id: 'hourly', label: 'Saatlik', days: 1/24, unit: 'saat' },
   { id: 'weekly', label: 'Haftalık', days: 7, unit: 'hafta' },
   { id: 'monthly', label: 'Aylık', days: 30, unit: 'ay' },
   { id: 'yearly', label: 'Yıllık', days: 365, unit: 'yıl' },
@@ -20,8 +18,6 @@ export interface Package {
   tagline: string;
   /** base price before counter */
   basePrices: Record<Period, number>;
-  /** additional credit (USD) given to user account when purchasing this period */
-  creditOptions: number[]; // e.g., [5, 10, 0] for $5, $10, or no credit
   features: string[];
   highlight?: string;
 }
@@ -32,8 +28,7 @@ export const PACKAGES: Package[] = [
     name: 'Ücretsiz',
     monthlyMinutes: 0,
     tagline: 'Sınırsız yazılı çeviri ve temel özellikler',
-    basePrices: { daily: 0, hourly: 0, weekly: 0, monthly: 0, yearly: 0 },
-    creditOptions: [0],
+    basePrices: { weekly: 0, monthly: 0, yearly: 0 },
     features: [
       'Tarayıcının kendi sesli çevirisi (1–2 sn gecikmeli)',
       'Sınırsız yazılı çeviri',
@@ -45,8 +40,7 @@ export const PACKAGES: Package[] = [
     name: 'Standart',
     monthlyMinutes: 200,
     tagline: 'Her gün konuşan çiftler ve arkadaşlar için',
-    basePrices: { daily: 0.99, hourly: 0.04, weekly: 6.99, monthly: 19.99, yearly: 199.99 },
-    creditOptions: [5, 10, 0], // $5, $10, or no credit
+    basePrices: { weekly: 6.99, monthly: 19.99, yearly: 199.99 },
     features: [
       'Gemini canlı sesli çeviri (VIP ses kalitesi)',
       'Konuşurken canlı altyazı',
@@ -60,8 +54,7 @@ export const PACKAGES: Package[] = [
     name: 'Premium',
     monthlyMinutes: 300,
     tagline: 'İş, seyahat ve uzun görüşmeler için',
-    basePrices: { daily: 1.49, hourly: 0.06, weekly: 10.49, monthly: 29.99, yearly: 299.99 },
-    creditOptions: [5, 10, 0], // $5, $10, or no credit
+    basePrices: { weekly: 10.49, monthly: 29.99, yearly: 299.99 },
     features: [
       'Standart\'daki her şey',
       'İki kat sesli çeviri süresi',
@@ -74,8 +67,6 @@ export const PACKAGES: Package[] = [
 /** Minutes included in one period of a package */
 export const periodMinutes = (pkg: Package, period: Period) => {
   switch (period) {
-    case 'daily': return Math.round(pkg.monthlyMinutes / 30);
-    case 'hourly': return Math.round(pkg.monthlyMinutes / (30 * 24));
     case 'weekly': return Math.round(pkg.monthlyMinutes / 4);
     case 'yearly': return pkg.monthlyMinutes * 12;
     default: return pkg.monthlyMinutes; // monthly
@@ -98,7 +89,5 @@ export function describePlan(key: string | null) {
   const period = PERIODS.find(p => p.id === periodId);
   if (!pkg || !period) return null;
   return { pkg, period, label: `${pkg.name} · ${period.label}`, price: formatUsd(pkg.basePrices[period.id]),
-    // Whole days for the admin RPC; hourly plans are granted one hour server-side
-    days: Math.max(1, Math.round(period.days)),
-    duration: period.id === 'hourly' ? '1 saat' : `${Math.round(period.days)} gün` };
+    days: period.days, duration: `${period.days} gün` };
 }
