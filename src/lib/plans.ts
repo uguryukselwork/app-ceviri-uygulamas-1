@@ -18,7 +18,10 @@ export interface Package {
   /** VIP voice translation minutes per month */
   monthlyMinutes: number;
   tagline: string;
-  basePrices: Record<Period, number>; // base price before counter
+  /** base price before counter */
+  basePrices: Record<Period, number>;
+  /** additional credit (USD) given to user account when purchasing this period */
+  creditOptions: number[]; // e.g., [5, 10, 0] for $5, $10, or no credit
   features: string[];
   highlight?: string;
 }
@@ -30,6 +33,7 @@ export const PACKAGES: Package[] = [
     monthlyMinutes: 0,
     tagline: 'Sınırsız yazılı çeviri ve temel özellikler',
     basePrices: { daily: 0, hourly: 0, weekly: 0, monthly: 0, yearly: 0 },
+    creditOptions: [0],
     features: [
       'Tarayıcının kendi sesli çevirisi (1–2 sn gecikmeli)',
       'Sınırsız yazılı çeviri',
@@ -42,6 +46,7 @@ export const PACKAGES: Package[] = [
     monthlyMinutes: 200,
     tagline: 'Her gün konuşan çiftler ve arkadaşlar için',
     basePrices: { daily: 0.99, hourly: 0.04, weekly: 6.99, monthly: 19.99, yearly: 199.99 },
+    creditOptions: [5, 10, 0], // $5, $10, or no credit
     features: [
       'Gemini canlı sesli çeviri (VIP ses kalitesi)',
       'Konuşurken canlı altyazı',
@@ -56,6 +61,7 @@ export const PACKAGES: Package[] = [
     monthlyMinutes: 300,
     tagline: 'İş, seyahat ve uzun görüşmeler için',
     basePrices: { daily: 1.49, hourly: 0.06, weekly: 10.49, monthly: 29.99, yearly: 299.99 },
+    creditOptions: [5, 10, 0], // $5, $10, or no credit
     features: [
       'Standart\'daki her şey',
       'İki kat sesli çeviri süresi',
