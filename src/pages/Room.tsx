@@ -8,7 +8,7 @@ import VoiceCallBar from '../components/VoiceCallBar';
 import VoiceModeSheet from '../components/VoiceModeSheet';
 import { joinLiveChannel, type LiveChannel, type CallMember } from '../lib/live';
 import {
-  VoiceTranslator, BrowserVoiceTranslator, PcmPlayer, speak,
+  VoiceTranslator, BrowserVoiceTranslator, PcmPlayer, speak, isSpeaking,
   type VoiceState, type VoiceEngine, type VoiceMode
 } from '../lib/voice';
 import { motion, AnimatePresence } from 'motion/react';
@@ -310,10 +310,25 @@ export default function Room() {
     const now = Date.now();
     heardLog.current = [...heardLog.current.filter(h => now - h.at < 15000), { text, at: now }];
   };
+  // What I said lately (and its translation). When the two phones are in one room, my partner's speaker
+  // plays my translation into my own mic; without this it would be translated and sent again and again.
+  const saidLog = useRef<{ text: string; at: number }[]>([]);
+  const rememberSaid = (...texts: (string | undefined)[]) => {
+    const now = Date.now();
+    saidLog.current = [
+      ...saidLog.current.filter(h => now - h.at < 8000),
+      ...texts.filter((t): t is string => !!t?.trim()).map(text => ({ text, at: now })),
+    ];
+  };
   const recentlyHeard = () => {
     const now = Date.now();
-    return heardLog.current.filter(h => now - h.at < 15000).map(h => h.text).join(' ');
+    return [
+      ...heardLog.current.filter(h => now - h.at < 15000),
+      ...saidLog.current.filter(h => now - h.at < 8000),
+    ].map(h => h.text).join(' ');
   };
+  // Partner audio from my speaker: VIP audio or a translation read aloud
+  const isHearingPartner = () => playerRef.current.isPlaying || isSpeaking();
 
   // VIP membership decides whether the VIP (Gemini Live) option can be picked
   const refreshVipStatus = () => { fetchVipStatus(profile.id).then(setVipStatus).catch(() => {}); };
@@ -326,6 +341,7 @@ export default function Room() {
   // A partner on the free engine sends text only: read their voice sentences aloud here, one after another.
   // (A partner on VIP sends translated audio, which the player handles.)
   const spokenIds = useRef(new Set<string>());
+  const lastSpoken = useRef({ text: '', at: 0 });
   const speechQueue = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     if (!inCall || partnerEngineRef.current !== 'free') return;
@@ -335,6 +351,10 @@ export default function Room() {
       const text = m.translated_text || m.original_text;
       speechQueue.current = speechQueue.current.then(async () => {
         if (!inCallRef.current) return;
+        // The same sentence twice in a few seconds is a repeat, not something new to hear
+        const key = text.trim().toLocaleLowerCase();
+        if (key === lastSpoken.current.text && Date.now() - lastSpoken.current.at < 8000) return;
+        lastSpoken.current = { text: key, at: Date.now() };
         const engine = translatorRef.current;
         if (engine instanceof BrowserVoiceTranslator) engine.setHeld(true);
         rememberHeard(text);
@@ -371,12 +391,14 @@ export default function Room() {
     // Only sentences spoken from now on are read aloud
     spokenIds.current = new Set(messages.map(m => m.id));
     heardLog.current = [];
+    saidLog.current = [];
+    lastSpoken.current = { text: '', at: 0 };
 
     const engine: VoiceEngine = mode === 'paid'
       ? new VoiceTranslator({
           roomId,
           targetLanguage: targetLanguage(),
-          isHearingPartner: () => playerRef.current.isPlaying,
+          isHearingPartner,
           recentlyHeard,
           onState: onEngineState,
           onAudio: (data) => liveRef.current?.sendAudio(data),
@@ -385,15 +407,20 @@ export default function Room() {
             liveRef.current?.sendCaption(translated);
           },
           onSentence: (original, translated) => {
+            rememberSaid(original, translated);
             void postMessageRef.current(original, { is_voice: true }, translated || undefined);
           },
         })
       : new BrowserVoiceTranslator({
           language: profile.language,
           recentlyHeard,
+          isHearingPartner: () => playerRef.current.isPlaying,
           onState: onEngineState,
           onCaption: setMyCaption,
-          onSentence: (original) => { void postMessageRef.current(original, { is_voice: true }); },
+          onSentence: (original) => {
+            rememberSaid(original);
+            void postMessageRef.current(original, { is_voice: true });
+          },
         });
     translatorRef.current = engine;
     void engine.start();

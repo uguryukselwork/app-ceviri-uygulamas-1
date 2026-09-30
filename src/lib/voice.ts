@@ -7,6 +7,8 @@ import { getAudioContext } from './utils';
 
 const INPUT_RATE = 16000;
 const OUTPUT_RATE = 24000;
+/** Echo is judged once a sentence has this many words (or when it ends): one common word is not enough */
+const ECHO_MIN_WORDS = 3;
 /** Silence after the last transcript before the sentence is saved as a message */
 const SEGMENT_IDLE_MS = 1300;
 /** Translated audio is relayed in ~200 ms batches to keep the realtime message rate low */
@@ -111,6 +113,47 @@ export function isEcho(said: string, recentlyHeard: string) {
   return matched / saidWords.length >= 0.6;
 }
 
+/** "nasılsın nasılsın nasılsın" -> "nasılsın": drops a word run (1-6 words) repeated right after itself */
+export function collapseRepeats(text: string) {
+  const tokens = text.trim().split(/\s+/).filter(Boolean);
+  const key = (t: string) => words(t).join(' ');
+  // One word said twice is normal speech ("yavaş yavaş", "evet evet"); three or more times is a glitch
+  for (let i = 0; i + 2 < tokens.length;) {
+    const k = key(tokens[i]);
+    let run = 1;
+    while (i + run < tokens.length && k && key(tokens[i + run]) === k) run++;
+    if (run >= 3) tokens.splice(i + 1, run - 1);
+    i++;
+  }
+  for (let size = 2; size <= 6; size++) {
+    for (let i = 0; i + size * 2 <= tokens.length;) {
+      const a = tokens.slice(i, i + size).map(key).join(' ');
+      const b = tokens.slice(i + size, i + size * 2).map(key).join(' ');
+      if (a && a === b) tokens.splice(i + size, size);
+      else i++;
+    }
+  }
+  return tokens.join(' ');
+}
+
+/** Drops a sentence that repeats (or is part of) the one just sent. Phones re-deliver finished sentences. */
+class SentenceGate {
+  private last = '';
+  private at = 0;
+  constructor(private windowMs = 6000) {}
+
+  pass(text: string) {
+    const key = words(text).join(' ');
+    if (!key) return false;
+    const now = Date.now();
+    const recent = now - this.at < this.windowMs;
+    if (recent && (key === this.last || this.last.includes(key))) return false;
+    this.last = key;
+    this.at = now;
+    return true;
+  }
+}
+
 export interface VoiceOptions {
   roomId: string;
   /** Language my speech is translated into (the partner's) */
@@ -143,6 +186,7 @@ export class VoiceTranslator implements VoiceEngine {
   private relay: Uint8Array[] = [];
   private relayTimer: ReturnType<typeof setInterval> | null = null;
   private retries = 0;
+  private gate = new SentenceGate();
 
   constructor(private opts: VoiceOptions) {}
 
@@ -222,7 +266,7 @@ export class VoiceTranslator implements VoiceEngine {
           if (c.inputTranscription?.text) {
             this.original += c.inputTranscription.text;
             if (c.inputTranscription.languageCode) this.detected = c.inputTranscription.languageCode;
-            if (!this.echo && isEcho(this.original, this.opts.recentlyHeard())) {
+            if (!this.echo && words(this.original).length >= ECHO_MIN_WORDS && isEcho(this.original, this.opts.recentlyHeard())) {
               this.echo = true;
               this.relay = [];
             }
@@ -273,22 +317,24 @@ export class VoiceTranslator implements VoiceEngine {
   private finishSentence() {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = null;
-    const original = this.original.trim();
-    const translated = this.translated.trim();
-    const echo = this.echo;
+    const original = collapseRepeats(this.original);
+    const translated = collapseRepeats(this.translated);
+    // Short sentences are judged now that they are complete
+    const echo = this.echo || isEcho(original, this.opts.recentlyHeard());
     if (!echo) this.flushRelay(true);
     this.original = '';
     this.translated = '';
     this.echo = false;
     this.relay = [];
     this.opts.onCaption('', '');
-    if (original && !echo) this.opts.onSentence(original, translated, this.detected);
+    if (original && !echo && this.gate.pass(original)) this.opts.onSentence(original, translated, this.detected);
   }
 
   /** Audio waits until the transcript shows the sentence is not echo */
   private flushRelay(force = false) {
     if (!this.relay.length || this.echo) return;
-    if (!force && !this.original.trim()) return;
+    // Until a sentence is long enough to judge, its audio waits (short ones are sent when they end)
+    if (!force && words(this.original).length < ECHO_MIN_WORDS) return;
     const total = this.relay.reduce((n, b) => n + b.length, 0);
     const merged = new Uint8Array(total);
     let offset = 0;
@@ -339,11 +385,16 @@ export interface VoiceEngine {
 const SPEECH_LOCALES: Record<string, string> = {
   tr: 'tr-TR', en: 'en-US', de: 'de-DE', fr: 'fr-FR', es: 'es-ES', it: 'it-IT',
   ru: 'ru-RU', ar: 'ar-SA', ja: 'ja-JP', ko: 'ko-KR', th: 'th-TH', tk: 'tk-TM',
+  pt: 'pt-BR', nl: 'nl-NL', pl: 'pl-PL', uk: 'uk-UA', zh: 'zh-CN', hi: 'hi-IN', fa: 'fa-IR',
+  az: 'az-AZ', el: 'el-GR', sv: 'sv-SE', id: 'id-ID', vi: 'vi-VN', ro: 'ro-RO', bg: 'bg-BG',
 };
-const speechLocale = (lang: string) => SPEECH_LOCALES[lang] || lang;
+const speechLocale = (lang: string) => {
+  if (!lang || lang === 'auto') return typeof navigator !== 'undefined' ? navigator.language : 'en-US';
+  return SPEECH_LOCALES[lang] || lang;
+};
 
 type Recognition = {
-  lang: string; continuous: boolean; interimResults: boolean;
+  lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
   onstart: (() => void) | null; onend: (() => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
@@ -359,6 +410,8 @@ export interface BrowserVoiceOptions {
   language: string;
   /** What the partner said lately, in my language (see isEcho) */
   recentlyHeard: () => string;
+  /** True while the partner's VIP audio plays from my speaker; nothing I "say" then is sent */
+  isHearingPartner?: () => boolean;
   onState: (state: VoiceState, error?: string) => void;
   /** What I am saying right now, before it is final */
   onCaption: (original: string) => void;
@@ -373,6 +426,9 @@ export class BrowserVoiceTranslator implements VoiceEngine {
   private held = false;
   private running = false;
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Result indexes already sent in this recognition session (Android repeats old results) */
+  private handled = new Set<number>();
+  private gate = new SentenceGate();
 
   constructor(private opts: BrowserVoiceOptions) {}
 
@@ -390,15 +446,19 @@ export class BrowserVoiceTranslator implements VoiceEngine {
     rec.lang = speechLocale(this.opts.language);
     rec.continuous = true;
     rec.interimResults = true;
-    rec.onstart = () => { this.running = true; this.opts.onState('live'); };
+    rec.maxAlternatives = 1;
+    rec.onstart = () => { this.running = true; this.handled.clear(); this.opts.onState('live'); };
     rec.onresult = (e) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        const text = e.results[i][0].transcript.trim();
+        if (this.handled.has(i)) continue;
+        const text = collapseRepeats(e.results[i][0].transcript);
         if (!text) continue;
         if (e.results[i].isFinal) {
+          this.handled.add(i);
           this.opts.onCaption('');
-          if (!this.held && !isEcho(text, this.opts.recentlyHeard())) this.opts.onSentence(text);
+          const hearing = this.held || !!this.opts.isHearingPartner?.();
+          if (!hearing && !isEcho(text, this.opts.recentlyHeard()) && this.gate.pass(text)) this.opts.onSentence(text);
         } else {
           interim += (interim ? ' ' : '') + text;
         }
@@ -472,18 +532,80 @@ export function unlockSpeech() {
   } catch { /* no speech synthesis */ }
 }
 
-/** Reads text aloud in the given language; resolves when done */
-export function speak(text: string, lang: string): Promise<void> {
+let voicesReady: Promise<SpeechSynthesisVoice[]> | null = null;
+/** Chrome loads voices late: the first getVoices() is often empty */
+function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  const now = window.speechSynthesis.getVoices();
+  if (now.length) return Promise.resolve(now);
+  voicesReady ??= new Promise((resolve) => {
+    const done = () => resolve(window.speechSynthesis.getVoices());
+    window.speechSynthesis.addEventListener('voiceschanged', done, { once: true });
+    setTimeout(done, 1500);
+  });
+  return voicesReady;
+}
+
+/** The most natural installed voice for a language */
+function pickVoice(voices: SpeechSynthesisVoice[], locale: string, lang: string) {
+  const base = locale.split('-')[0].toLowerCase();
+  const same = (v: SpeechSynthesisVoice) => v.lang.replace('_', '-').toLowerCase();
+  const candidates = voices.filter(v => same(v) === locale.toLowerCase());
+  const pool = candidates.length ? candidates : voices.filter(v => same(v).split('-')[0] === (base || lang));
+  const score = (v: SpeechSynthesisVoice) =>
+    (/natural|neural|enhanced|premium|siri/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 2 : 0) + (v.default ? 1 : 0);
+  return pool.sort((a, b) => score(b) - score(a))[0];
+}
+
+/** Chrome cuts utterances off after ~15 seconds: speak long text sentence by sentence */
+function splitForSpeech(text: string) {
+  const parts = text.match(/[^.!?。！？]+[.!?。！？]*/g)?.map(p => p.trim()).filter(Boolean) ?? [text];
+  const chunks: string[] = [];
+  for (const part of parts) {
+    if (part.length <= 180) { chunks.push(part); continue; }
+    let rest = part;
+    while (rest.length > 180) {
+      const cut = rest.lastIndexOf(' ', 180);
+      chunks.push(rest.slice(0, cut > 40 ? cut : 180));
+      rest = rest.slice(cut > 40 ? cut + 1 : 180);
+    }
+    if (rest) chunks.push(rest);
+  }
+  return chunks;
+}
+
+function speakChunk(text: string, locale: string, voice?: SpeechSynthesisVoice): Promise<void> {
   return new Promise((resolve) => {
-    if (!('speechSynthesis' in window) || !text.trim()) return resolve();
-    const locale = speechLocale(lang);
     const u = new SpeechSynthesisUtterance(text);
     u.lang = locale;
-    const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find(v => v.lang === locale) || voices.find(v => v.lang.startsWith(lang));
     if (voice) u.voice = voice;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
+    u.rate = 1;
+    u.pitch = 1;
+    u.volume = 1;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(watchdog);
+      clearInterval(keepAlive);
+      resolve();
+    };
+    // Some phones never fire onend; never let one sentence block the call (the mic waits for it)
+    const watchdog = setTimeout(() => { window.speechSynthesis.cancel(); finish(); }, 3000 + text.length * 120);
+    // Chrome pauses long speech in the background; nudging it keeps it going
+    const keepAlive = setInterval(() => { if (window.speechSynthesis.paused) window.speechSynthesis.resume(); }, 1000);
+    u.onend = finish;
+    u.onerror = finish;
     window.speechSynthesis.speak(u);
   });
 }
+
+/** Reads text aloud in the given language with the most natural voice available; resolves when done */
+export async function speak(text: string, lang: string): Promise<void> {
+  if (!('speechSynthesis' in window) || !text.trim()) return;
+  const locale = speechLocale(lang);
+  const voice = pickVoice(await loadVoices(), locale, lang);
+  for (const chunk of splitForSpeech(collapseRepeats(text))) await speakChunk(chunk, locale, voice);
+}
+
+/** True while this phone reads a translation aloud */
+export const isSpeaking = () => typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking;
