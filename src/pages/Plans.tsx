@@ -37,9 +37,11 @@ export default function Plans() {
 
   useEffect(() => {
     if (!profile.id) return;
-    void refresh();
-    const unsubscribe = subscribeToMembership(profile.id, () => { void refresh(); });
-    const onVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
+    // Without this a failed load leaves the membership card spinning forever
+    const load = () => refresh().catch(() => setNotice({ tone: 'error', text: 'Üyelik bilgileri yüklenemedi. Bağlantını kontrol et.' }));
+    void load();
+    const unsubscribe = subscribeToMembership(profile.id, () => { void load(); });
+    const onVisible = () => { if (document.visibilityState === 'visible') void load(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => { unsubscribe(); document.removeEventListener('visibilitychange', onVisible); };
   }, [profile.id]);

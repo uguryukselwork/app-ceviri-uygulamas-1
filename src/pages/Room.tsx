@@ -96,6 +96,25 @@ export default function Room() {
     return () => document.removeEventListener('visibilitychange', markSeen);
   }, [messages, roomId, profile.id]);
 
+  // A translation request lost to a network drop leaves a message "çevriliyor…" forever: ask again once
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const retriedIds = useRef(new Set<string>());
+  useEffect(() => {
+    if (!roomId) return;
+    const STUCK_MS = 20000;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      for (const m of messagesRef.current) {
+        if (m.translation_status !== 'pending' || retriedIds.current.has(m.id)) continue;
+        if (now - new Date(m.created_at).getTime() < STUCK_MS) continue;
+        retriedIds.current.add(m.id);
+        void requestTranslation(m.id);
+      }
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [roomId]);
+
   // Latest notification preferences, read inside the realtime callback without resubscribing
   const notifyPrefs = useRef({ soundEnabled, notificationSound, soundVolume, vibrationEnabled });
   notifyPrefs.current = { soundEnabled, notificationSound, soundVolume, vibrationEnabled };
@@ -128,6 +147,13 @@ export default function Room() {
     let mounted = true;
     let unsubscribe: (() => void) | null = null;
     let onResync: (() => void) | null = null;
+
+    // Switching rooms from "Odalarım" reuses this page: drop what belonged to the previous room
+    setRoomId(null);
+    setRoomError(null);
+    setParticipants([]);
+    setMessages([]);
+    setReplyTo(null);
 
     const loadParticipants = async (rId: string) => {
       const data = await fetchParticipants(rId);
@@ -173,7 +199,8 @@ export default function Room() {
             notifyIncoming(latest);
             setMessages(prev => {
               const fetched = new Set(latest.map(m => m.id));
-              return [...latest, ...prev.filter(m => !fetched.has(m.id))];
+              return [...latest, ...prev.filter(m => !fetched.has(m.id))]
+                .sort((a, b) => a.created_at.localeCompare(b.created_at));
             });
           } catch (e) {
             console.error('Resync error:', e);
@@ -440,8 +467,9 @@ export default function Room() {
   useEffect(() => {
     if (!inCall || callMode !== 'paid' || voiceState !== 'live' || muted) return;
     const TICK = 10;
-    const timer = setInterval(() => {
-      consumeVipSeconds(TICK).then(left => {
+    let lastTick = Date.now();
+    const consume = (seconds: number) =>
+      consumeVipSeconds(seconds).then(left => {
         if (left < 0) return; // package or free-for-all: not metered
         setVipStatus(s => s && { ...s, vipSeconds: left });
         if (left === 0) {
@@ -450,8 +478,16 @@ export default function Room() {
           refreshVipStatus();
         }
       }).catch(() => {});
+    const timer = setInterval(() => {
+      lastTick = Date.now();
+      void consume(TICK);
     }, TICK * 1000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      // The part of the last 10 seconds before hang-up / mute counts too (short calls were free before)
+      const rest = Math.round((Date.now() - lastTick) / 1000);
+      if (rest >= 1) void consume(rest);
+    };
   }, [inCall, callMode, voiceState, muted]);
 
   const toggleMute = () => {

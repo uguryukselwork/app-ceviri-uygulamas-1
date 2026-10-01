@@ -70,15 +70,16 @@ export async function fetchParticipants(roomId: string): Promise<Participant[]> 
   return (data ?? []).map(toParticipant);
 }
 
+/** The newest 500 messages of the room, oldest first */
 export async function fetchMessages(roomId: string): Promise<MessageType[]> {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
     .eq('room_id', roomId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(500);
   if (error) throw error;
-  return (data ?? []) as MessageType[];
+  return ((data ?? []) as MessageType[]).reverse();
 }
 
 /** Asks the translate edge function to (re)translate a message; the result arrives via realtime.
@@ -106,7 +107,10 @@ export async function sendMessage(msg: {
     // default to opposite of source if source is tr/en, else default to en
     targetLang = msg.original_language === 'tr' ? 'en' : 'tr';
   }
-  const { data, error } = await supabase.from('messages').insert({ ...msg, target_language: targetLang }).select('*').single();
+  // An uploaded photo is a ~15 KB data URL: keep it on the participant row, not on every message
+  const senderAvatar = msg.sender_avatar?.startsWith('data:') ? null : msg.sender_avatar;
+  const { data, error } = await supabase.from('messages')
+    .insert({ ...msg, sender_avatar: senderAvatar, target_language: targetLang }).select('*').single();
   if (error) throw error;
   void requestTranslation(data.id, spokenTranslation);
   return data as MessageType;

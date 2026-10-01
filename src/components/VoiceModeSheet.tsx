@@ -115,7 +115,7 @@ export default function VoiceModeSheet({ open, status, onClose, onStart, onOpenP
                 onClick={onOpenPlans}
                 className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-2xl py-2.5 text-[14px] font-bold text-amber-700 bg-amber-500/12 hover:bg-amber-500/20 transition-colors cursor-pointer"
               >
-                <Sparkles className="w-4 h-4" /> VIP ol ya da hediyeni al
+                <Sparkles className="w-4 h-4" /> VIP paketlerini gör
               </button>
             )}
 
