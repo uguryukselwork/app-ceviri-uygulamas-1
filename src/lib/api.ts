@@ -280,6 +280,19 @@ export async function adminGrantHours(pin: string, userId: string, hours: number
   return data === true;
 }
 
+/** Shows a note to every user (empty text removes it) */
+export async function adminSetAnnouncement(pin: string, text: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_set_announcement', { p_pin: pin, p_text: text });
+  if (error) throw adminError(error);
+  return data === true;
+}
+
+/** The admin's note to all users, '' when there is none. Readable signed out too. */
+export async function fetchAnnouncement(): Promise<string> {
+  const { data } = await supabase.from('app_settings').select('value').eq('key', 'announcement').maybeSingle();
+  return typeof data?.value === 'string' ? data.value : '';
+}
+
 /** Counts seconds of a VIP call against my talk time. Returns seconds left, or -1 when not metered. */
 export async function consumeVipSeconds(seconds: number): Promise<number> {
   const { data, error } = await supabase.rpc('consume_vip_seconds', { p_seconds: Math.round(seconds) });

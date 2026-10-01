@@ -8,6 +8,7 @@ import { cn, compressImage } from '../lib/utils';
 import SettingsSheet from '../components/SettingsSheet';
 import AccountSheet from '../components/AccountSheet';
 import AdminPanel from '../components/AdminPanel';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 
 /** Taps on the logo, each within this long of the previous one, that open the admin panel */
 const ADMIN_TAPS = 5;
@@ -207,6 +208,7 @@ export default function Home() {
       </header>
 
       <div className="w-full max-w-sm flex flex-col flex-1 justify-center gap-7 z-10 px-6 pt-4 pb-8">
+        <AnnouncementBanner />
         {/* Avatar + self-translating greeting */}
         <div className="flex flex-col items-center gap-5">
           <div className="relative">

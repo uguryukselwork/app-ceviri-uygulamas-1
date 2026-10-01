@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AudioLines, Crown, Check, Lock, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { primaryButton } from './ui';
+import AnnouncementBanner from './AnnouncementBanner';
 import type { VipStatus } from '../lib/api';
 import type { VoiceMode } from '../lib/voice';
 import { formatTalkTime } from '../lib/plans';
@@ -88,6 +89,7 @@ export default function VoiceModeSheet({ open, status, onClose, onStart, onOpenP
             <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-(--theme-border)" aria-hidden />
             <h2 className="font-display font-semibold text-xl text-(--theme-ink) mb-1">Sesli çeviri</h2>
             <p className="text-[13px] text-(--theme-muted) mb-4">Telefon görüşmesi gibi konuş, karşı taraf kendi dilinde duysun.</p>
+            <AnnouncementBanner className="mb-4" />
 
             <div className="space-y-3" role="radiogroup" aria-label="Üyelik seçeneği">
               {option(

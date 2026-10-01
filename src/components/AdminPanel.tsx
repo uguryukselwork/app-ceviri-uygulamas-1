@@ -1,39 +1,36 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ShieldCheck, Check, Loader2, Crown, Users, Ban, Gift, ShoppingBag, X, Trash2, Copy, Wand2, RefreshCw, Ticket, Search, Wallet, Clock, ChevronDown
+  ShieldCheck, Check, Loader2, Crown, Users, Megaphone, Gift, ShoppingBag, X, Trash2, Copy, Wand2, RefreshCw, Ticket, Search, Wallet, Clock, ChevronDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fieldClass, primaryButton, IconTile, softIconButton } from './ui';
 import {
   adminCheckPin, adminOverview, adminSetVipAccess, adminCreatePromo, adminDeletePromo, adminDecideRequest, adminAddBalance, adminGrantHours,
+  adminSetAnnouncement, fetchAnnouncement,
   type AdminOverview, type AdminUser, type VipAccess, type VipRequest
 } from '../lib/api';
 import { describePlan, PACKAGES, PERIODS, formatTalkTime } from '../lib/plans';
 
+// Applies to every user at once
 const ACCESS_OPTIONS: { id: VipAccess; title: string; description: string; icon: React.ReactNode; tone: string }[] = [
   {
-    id: 'members',
-    title: 'Sadece VIP üyeler',
-    description: 'VIP sesli çeviriyi (Gemini) yalnızca VIP üyeliği olanlar kullanır. Diğerleri ücretsiz modu kullanır.',
-    icon: <Crown className="w-5 h-5" />,
-    tone: 'bg-amber-500/15 text-amber-600',
-  },
-  {
     id: 'everyone',
-    title: 'Herkes VIP\'i ücretsiz kullansın',
-    description: 'Tüm kullanıcılar VIP sesli çeviriyi ücretsiz seçebilir. Gemini ücreti sana yansır.',
+    title: 'Ücretsiz',
+    description: 'Tüm kullanıcılar VIP sesli çeviriyi bedava kullanır. Gemini ücreti sana yansır.',
     icon: <Users className="w-5 h-5" />,
     tone: 'bg-emerald-500/15 text-emerald-600',
   },
   {
-    id: 'off',
-    title: 'Herkes ücretsiz modu kullansın',
-    description: 'VIP kapalı. Herkes tarayıcının ücretsiz sesli çevirisini kullanır, VIP üyeler dahil.',
-    icon: <Ban className="w-5 h-5" />,
-    tone: 'bg-slate-500/15 text-slate-600',
+    id: 'members',
+    title: 'Ücretli',
+    description: 'VIP sesli çeviriyi yalnızca paketi ya da konuşma hakkı olanlar kullanır. Diğerleri ücretsiz modu kullanır.',
+    icon: <Crown className="w-5 h-5" />,
+    tone: 'bg-amber-500/15 text-amber-600',
   },
 ];
+
+const FREE_ANNOUNCEMENT = 'VIP üyelik şimdilik herkese bedava! 🎉';
 
 const GIFT_DURATIONS = [
   { days: 7, label: '1 hafta' },
@@ -76,6 +73,8 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [customHours, setCustomHours] = useState('');
+  const [announcement, setAnnouncement] = useState('');
+  const [draft, setDraft] = useState('');
 
   // Forget the PIN whenever the panel closes
   useEffect(() => {
@@ -95,6 +94,7 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
     if (message.includes('request_not_pending')) return 'Bu istek zaten yanıtlanmış.';
     if (message.includes('invalid_amount')) return 'Geçerli bir tutar gir (en fazla 10.000$).';
     if (message.includes('invalid_hours')) return 'Geçerli bir süre gir (1–8760 saat).';
+    if (message.includes('too_long')) return 'Duyuru en fazla 280 karakter olabilir.';
     return 'Bir sorun oluştu. Bağlantını kontrol et.';
   };
 
@@ -107,8 +107,13 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
       return false;
     }
     setOverview(data);
+    const current = await fetchAnnouncement().catch(() => announcement);
+    setAnnouncement(current);
     return true;
   };
+
+  // The box starts from what is published (filled in once the panel opens)
+  useEffect(() => { setDraft(announcement); }, [announcement]);
 
   /** Runs an admin action, then reloads the panel */
   const run = async (key: string, action: () => Promise<boolean>, done?: string) => {
@@ -247,8 +252,8 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
                 )}
 
                 {/* VIP access for everyone */}
-                <section className="space-y-2.5" role="radiogroup" aria-label="VIP erişimi">
-                  <h3 className={sectionTitle}>VIP erişimi</h3>
+                <section className="space-y-2.5" role="radiogroup" aria-label="VIP kullanımı">
+                  <h3 className={sectionTitle}>VIP kullanımı · tüm kullanıcılar</h3>
                   {ACCESS_OPTIONS.map(o => {
                     const selected = overview.vip_access === o.id;
                     return (
@@ -258,7 +263,12 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
                         role="radio"
                         aria-checked={selected}
                         disabled={!!busy}
-                        onClick={() => !selected && run(`access-${o.id}`, () => adminSetVipAccess(pin, o.id), 'Kaydedildi. Yeni görüşmelerde geçerli olur.')}
+                        onClick={() => {
+                          if (selected) return;
+                          // Going free: suggest telling everyone (published only when "Yayınla" is tapped)
+                          if (o.id === 'everyone' && !draft.trim()) setDraft(FREE_ANNOUNCEMENT);
+                          void run(`access-${o.id}`, () => adminSetVipAccess(pin, o.id), 'Kaydedildi. Tüm kullanıcılarda yeni görüşmelerden itibaren geçerli.');
+                        }}
                         className={cn(
                           'w-full text-left rounded-3xl border-2 p-3.5 flex items-center gap-3 transition-colors cursor-pointer disabled:cursor-wait',
                           selected ? 'border-(--theme-accent) bg-(--theme-accent-light)' : 'border-(--theme-border) bg-(--theme-card-bg) hover:border-(--theme-accent)'
@@ -278,6 +288,51 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
                       </button>
                     );
                   })}
+                </section>
+
+                {/* Announcement to every user */}
+                <section className="space-y-2.5">
+                  <h3 className={sectionTitle}>Tüm kullanıcılara duyuru</h3>
+                  <form
+                    className="rounded-3xl border-2 border-(--theme-border) bg-(--theme-card-bg) p-3.5 space-y-2.5"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void run('announce', () => adminSetAnnouncement(pin, draft), 'Duyuru yayınlandı. Herkes ana sayfada ve planlarda görür.');
+                    }}
+                  >
+                    <textarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value.slice(0, 280))}
+                      rows={2}
+                      placeholder={`Örn. ${FREE_ANNOUNCEMENT}`}
+                      aria-label="Duyuru metni"
+                      className={cn(fieldClass, 'resize-none')}
+                    />
+                    <p className="text-[12px] text-(--theme-muted) px-1">
+                      {announcement ? `Yayında: “${announcement}”` : 'Şu an yayında duyuru yok.'}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={!draft.trim() || draft.trim() === announcement || !!busy}
+                        className={cn(primaryButton, 'py-3 flex-1')}
+                      >
+                        {busy === 'announce' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
+                        Yayınla
+                      </button>
+                      {announcement && (
+                        <button
+                          type="button"
+                          disabled={!!busy}
+                          onClick={() => run('announce-clear', () => adminSetAnnouncement(pin, ''), 'Duyuru kaldırıldı.')}
+                          className="px-4 rounded-2xl bg-(--theme-subtle-bg) text-(--theme-ink) text-[14px] font-bold flex items-center gap-1.5 hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50 cursor-pointer"
+                        >
+                          {busy === 'announce-clear' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          Kaldır
+                        </button>
+                      )}
+                    </div>
+                  </form>
                 </section>
 
                 {/* Requests */}

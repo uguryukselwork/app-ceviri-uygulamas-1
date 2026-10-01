@@ -5,6 +5,7 @@ import { Crown, Check, Loader2, PartyPopper, Clock, Sparkles, Wallet } from 'luc
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { SheetHeader, Segmented, primaryButton, secondaryButton } from '../components/ui';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 import {
   fetchVipStatus, fetchMyLatestRequest, subscribeToMembership, requestVip, buyWithBalance,
   type VipStatus, type VipRequest
@@ -93,6 +94,7 @@ export default function Plans() {
 
       <div className="flex-1 overflow-y-auto px-4 pt-5 pb-12">
         <div className="max-w-lg mx-auto space-y-5">
+          <AnnouncementBanner />
           {/* Current membership */}
           <div className={cn(
             'rounded-[1.75rem] p-5 border-2',
