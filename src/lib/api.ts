@@ -1,6 +1,7 @@
 // Data access for rooms, participants and messages (Supabase).
 // Row level security limits every query to rooms the signed-in user belongs to.
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from './supabase';
 import type { MessageType } from '../components/ChatMessage';
 
@@ -150,8 +151,10 @@ export async function fetchVipStatus(userId: string): Promise<VipStatus> {
 
 /** Fires when the admin grants me VIP (or my latest request is decided) */
 export function subscribeToMembership(userId: string, onChange: () => void): () => void {
+  // App and the Plans page listen at the same time. supabase.channel() hands back an existing channel with the
+  // same name, and adding listeners to an already subscribed one throws (blank Plans page): keep names unique.
   const channel = supabase
-    .channel(`membership:${userId}`)
+    .channel(`membership:${userId}:${uuidv4()}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'memberships', filter: `user_id=eq.${userId}` }, onChange)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vip_requests', filter: `user_id=eq.${userId}` }, onChange)
     .subscribe();
@@ -326,7 +329,7 @@ export function subscribeToRoom(roomId: string, handlers: {
   onSubscribed?: () => void;
 }): () => void {
   const channel: RealtimeChannel = supabase
-    .channel(`room:${roomId}`)
+    .channel(`room:${roomId}:${uuidv4()}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
       (payload) => handlers.onMessageInsert(payload.new as MessageType))
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
