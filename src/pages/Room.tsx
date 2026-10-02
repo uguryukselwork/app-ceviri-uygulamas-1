@@ -2,13 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import RoomHeader from '../components/RoomHeader';
-import ChatInput from '../components/ChatInput';
+import ChatInput, { type ChatInputHandle } from '../components/ChatInput';
 import ChatMessage, { MessageType, readableText } from '../components/ChatMessage';
 import VoiceCallBar from '../components/VoiceCallBar';
 import VoiceModeSheet from '../components/VoiceModeSheet';
 import { joinLiveChannel, type LiveChannel, type CallMember } from '../lib/live';
 import {
-  VoiceTranslator, BrowserVoiceTranslator, PcmPlayer, speak, isSpeaking,
+  VoiceTranslator, BrowserVoiceTranslator, PcmPlayer, speak, isSpeaking, isDictationSupported,
   type VoiceState, type VoiceEngine, type VoiceMode
 } from '../lib/voice';
 import { motion, AnimatePresence } from 'motion/react';
@@ -59,6 +59,7 @@ export default function Room() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [callMembers, setCallMembers] = useState<CallMember[]>([]);
   const [showVoiceModes, setShowVoiceModes] = useState(false);
+  const chatInputRef = useRef<ChatInputHandle>(null);
   const [vipStatus, setVipStatus] = useState<VipStatus | null>(null);
   const [inCall, setInCall] = useState(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('connecting');
@@ -638,6 +639,8 @@ export default function Room() {
         } : null}
         onCancelReply={() => setReplyTo(null)}
         onTyping={(typing) => liveRef.current?.setTyping(typing)}
+        micBusy={inCall}
+        ref={chatInputRef}
       />
 
       {/* Settings Overlay */}
@@ -830,6 +833,7 @@ export default function Room() {
         onClose={() => setShowVoiceModes(false)}
         onStart={startCall}
         onOpenPlans={() => { setShowVoiceModes(false); navigate('/plans'); }}
+        onDictate={isDictationSupported() && !inCall ? () => { setShowVoiceModes(false); chatInputRef.current?.startDictation(); } : undefined}
       />
 
       <SettingsSheet

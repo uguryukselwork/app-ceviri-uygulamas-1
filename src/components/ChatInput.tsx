@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Zap, Plus, X, Pencil, Trash2, Check, Reply } from 'lucide-react';
+import React, { useState, useRef, useEffect, useImperativeHandle } from 'react';
+import { Send, Zap, Plus, X, Pencil, Trash2, Check, Reply, Mic, Square } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import { t, getDefaultQuickMessages } from '../lib/i18n';
+import { Dictation } from '../lib/voice';
 
 /** Tell the partner "yazıyor…" at most this often while typing */
 const TYPING_PING_MS = 2500;
@@ -16,9 +17,17 @@ interface ChatInputProps {
   replyTo?: { name: string; text: string } | null;
   onCancelReply?: () => void;
   onTyping?: (typing: boolean) => void;
+  /** The microphone is taken by a voice call: no voice typing meanwhile */
+  micBusy?: boolean;
+  ref?: React.Ref<ChatInputHandle>;
 }
 
-export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, onTyping }: ChatInputProps) {
+export interface ChatInputHandle {
+  /** Voice typing, started from the voice sheet; must be called inside the tap */
+  startDictation: () => void;
+}
+
+export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, onTyping, micBusy, ref }: ChatInputProps) {
   const { profile, quickMessages: savedQuickMessages, addQuickMessage, removeQuickMessage, updateQuickMessage } = useStore();
   const quickMessages = savedQuickMessages ?? getDefaultQuickMessages(profile.language);
   const lang = profile.language;
@@ -29,6 +38,51 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
   const [editText, setEditText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Voice typing: what I say is written into the field; I can edit it before sending
+  const [dictating, setDictating] = useState(false);
+  const [dictationError, setDictationError] = useState<string | null>(null);
+  const dictationRef = useRef<Dictation | null>(null);
+  const dictationBase = useRef('');
+  const textRef = useRef('');
+  textRef.current = text;
+
+  const stopDictation = () => {
+    dictationRef.current?.stop();
+    dictationRef.current = null;
+    setDictating(false);
+  };
+
+  const startDictation = () => {
+    if (dictationRef.current || disabled || micBusy) return;
+    setDictationError(null);
+    dictationBase.current = textRef.current.trim();
+    const dictation = new Dictation({
+      language: lang,
+      onText: (finalText, interim) => {
+        const spoken = [finalText, interim].filter(Boolean).join(' ');
+        handleTextChange([dictationBase.current, spoken].filter(Boolean).join(' '));
+      },
+      onEnd: (error) => {
+        dictationRef.current = null;
+        setDictating(false);
+        if (error) setDictationError(error);
+      },
+    });
+    dictationRef.current = dictation;
+    setDictating(true);
+    dictation.start();
+  };
+
+  useImperativeHandle(ref, () => ({ startDictation }));
+
+  useEffect(() => { if (micBusy) stopDictation(); }, [micBusy]);
+  useEffect(() => () => dictationRef.current?.stop(), []);
+  useEffect(() => {
+    if (!dictationError) return;
+    const timer = setTimeout(() => setDictationError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [dictationError]);
 
   const startEditing = (msg: string) => {
     setEditingMsg(msg);
@@ -78,6 +132,7 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (text.trim() && !disabled) {
+      stopDictation();
       stopTyping();
       onSend(text.trim());
       setText('');
@@ -123,6 +178,20 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
       className="px-3 pt-2 pb-3 app-page-bg flex items-end gap-2 shrink-0 pb-safe z-20 transition-colors"
     >
       <div className="flex-1 min-w-0 relative bg-(--theme-card-bg) rounded-[1.6rem] border-2 border-(--theme-border) focus-within:border-(--theme-accent) transition-colors flex flex-col">
+        {dictating && (
+          <div className="flex items-center gap-2 mx-2 mt-2 pl-3 pr-1 py-1 rounded-2xl bg-red-500/10 text-red-600">
+            <Mic className="w-4 h-4 shrink-0 animate-pulse" aria-hidden />
+            <span className="flex-1 min-w-0 text-[13px] font-bold truncate">Dinliyorum… konuş, yazıya dökülsün</span>
+            <button
+              type="button"
+              onClick={stopDictation}
+              aria-label="Sesli yazmayı durdur"
+              className="h-8 shrink-0 rounded-full flex items-center gap-1 px-3 bg-red-500 text-white text-[12.5px] font-bold cursor-pointer"
+            >
+              <Square className="w-3 h-3 fill-current" /> Durdur
+            </button>
+          </div>
+        )}
         {replyTo && (
           <div className="flex items-center gap-2 mx-2 mt-2 pl-2.5 pr-1 py-1.5 rounded-2xl bg-(--theme-subtle-bg) border-l-4 border-(--theme-accent)">
             <Reply className="w-4 h-4 shrink-0 text-(--theme-accent)" aria-hidden />
@@ -311,12 +380,15 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
           onChange={(e) => handleTextChange(e.target.value)}
           onBlur={stopTyping}
           onKeyDown={handleKeyDown}
-          placeholder={t('room.type_message', profile.language)}
+          placeholder={dictating ? 'Dinliyorum… konuş' : t('room.type_message', profile.language)}
           disabled={disabled}
           rows={1}
           className="w-full max-h-32 bg-transparent border-none outline-none focus:ring-0 resize-none py-3 pr-4 text-[16px] sm:text-[15px] text-(--theme-ink) placeholder:text-(--theme-muted) disabled:opacity-50"
         />
         </div>
+        {dictationError && (
+          <p role="alert" className="px-4 pb-2 text-[12.5px] font-bold text-red-600">{dictationError}</p>
+        )}
       </div>
       
       <button
