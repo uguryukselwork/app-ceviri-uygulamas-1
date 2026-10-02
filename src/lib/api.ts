@@ -161,17 +161,6 @@ export function subscribeToMembership(userId: string, onChange: () => void): () 
   return () => { void supabase.removeChannel(channel); };
 }
 
-export type PromoResult = 'ok' | 'invalid' | 'used_up' | 'already_used' | 'too_many_attempts';
-
-export async function redeemPromoCode(code: string): Promise<PromoResult> {
-  const { data, error } = await supabase.rpc('redeem_promo_code', { p_code: code });
-  if (error) {
-    if (error.message.includes('too_many_attempts')) return 'too_many_attempts';
-    throw error;
-  }
-  return (data?.status ?? 'invalid') as PromoResult;
-}
-
 export interface VipRequest {
   id: string;
   user_id: string;
@@ -213,14 +202,6 @@ export async function adminCheckPin(pin: string): Promise<boolean> {
   return data === true;
 }
 
-export interface PromoCode {
-  code: string;
-  days: number;
-  max_uses: number;
-  uses: number;
-  created_at: string;
-}
-
 export interface AdminUser {
   user_id: string;
   name: string;
@@ -234,7 +215,6 @@ export interface AdminOverview {
   vip_access: VipAccess;
   vip_members: number;
   requests: VipRequest[];
-  promos: PromoCode[];
   users: AdminUser[];
 }
 
@@ -251,14 +231,23 @@ export async function adminSetVipAccess(pin: string, value: VipAccess): Promise<
   return data === true;
 }
 
-export async function adminCreatePromo(pin: string, code: string, days: number, maxUses: number): Promise<boolean> {
-  const { data, error } = await supabase.rpc('admin_create_promo', { p_pin: pin, p_code: code, p_days: days, p_max_uses: maxUses });
-  if (error) throw adminError(error);
-  return data === true;
+export interface RoomMember {
+  user_id: string;
+  name: string;
+  last_seen: string;
+  vip_until: string | null;
 }
 
-export async function adminDeletePromo(pin: string, code: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('admin_delete_promo', { p_pin: pin, p_code: code });
+/** People in the room with this code. null when the PIN is wrong; throws 'room_not_found'. */
+export async function adminRoomMembers(pin: string, code: string): Promise<RoomMember[] | null> {
+  const { data, error } = await supabase.rpc('admin_room_members', { p_pin: pin, p_code: code });
+  if (error) throw adminError(error);
+  return data as RoomMember[] | null;
+}
+
+/** Gives p_days of VIP, added to any VIP time left */
+export async function adminGrantVip(pin: string, userId: string, days: number): Promise<boolean> {
+  const { data, error } = await supabase.rpc('admin_grant_vip', { p_pin: pin, p_user: userId, p_days: days });
   if (error) throw adminError(error);
   return data === true;
 }

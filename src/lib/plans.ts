@@ -30,8 +30,7 @@ export const PACKAGES: Package[] = [
     tagline: 'Sınırsız yazılı çeviri ve temel özellikler',
     basePrices: { weekly: 0, monthly: 0, yearly: 0 },
     features: [
-      'Tarayıcının kendi sesli çevirisi (1–2 sn gecikmeli)',
-      'Sesli yazma: konuş, mesajın yazılsın',
+      'Sesli yazma: konuş, mesajın yazıya dönüşüp çevrilsin',
       'Sınırsız yazılı çeviri',
       'Yazıyor göstergesi, yanıtlama, okundu bilgisi',
     ],
@@ -46,7 +45,7 @@ export const PACKAGES: Package[] = [
       'Gemini canlı sesli çeviri (VIP ses kalitesi)',
       'Konuşurken canlı altyazı',
       'Sınırsız yazılı çeviri',
-      'Sınırsız ücretsiz sesli çeviri modu',
+      'Sınırsız sesli yazma',
     ],
     highlight: 'En çok tercih edilen',
   },

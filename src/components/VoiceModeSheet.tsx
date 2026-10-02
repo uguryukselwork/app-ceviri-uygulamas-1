@@ -15,48 +15,34 @@ interface VoiceModeSheetProps {
   onClose: () => void;
   onStart: (mode: VoiceMode) => void;
   onOpenPlans: () => void;
-  /** Voice typing into the message field; undefined when the browser can't do it */
+  /** Free option: voice typing into the message field; undefined when the browser can't do it */
   onDictate?: () => void;
 }
 
+type Choice = 'dictate' | 'paid';
+
 /**
- * Shown from the voice button: voice translation (free browser or VIP Gemini Live) or voice typing.
- * Voice translation with the free option is preselected.
+ * Shown from the voice button. Free: voice typing (speech becomes a text message, nothing is heard by the partner).
+ * VIP: live voice translation (Gemini Live), the partner hears me in their language. Free is preselected.
  */
 export default function VoiceModeSheet({ open, status, onClose, onStart, onOpenPlans, onDictate }: VoiceModeSheetProps) {
-  const [mode, setMode] = useState<VoiceMode>('free');
-  const [kind, setKind] = useState<'translate' | 'dictate'>('translate');
+  const [choice, setChoice] = useState<Choice>('dictate');
 
-  // Always start from voice translation, free option
-  useEffect(() => { if (open) { setMode('free'); setKind('translate'); } }, [open]);
-
-  const tab = (id: typeof kind, icon: ReactNode, label: string) => (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={kind === id}
-      onClick={() => setKind(id)}
-      className={cn(
-        'flex-1 flex items-center justify-center gap-1.5 rounded-full py-2.5 text-[14px] font-bold transition-colors cursor-pointer',
-        kind === id ? 'bg-(--theme-accent) text-(--theme-on-accent)' : 'text-(--theme-muted) hover:text-(--theme-ink)'
-      )}
-    >
-      {icon}{label}
-    </button>
-  );
+  // Always start from the free option
+  useEffect(() => { if (open) setChoice(onDictate ? 'dictate' : 'paid'); }, [open]);
 
   const vipLocked = !status?.canUseVip;
   const vipOff = status?.access === 'off';
 
-  const option = (id: VoiceMode, icon: ReactNode, title: string, badge: string, description: string, locked = false) => {
-    const selected = mode === id;
+  const option = (id: Choice, icon: ReactNode, title: string, badge: string, description: string, locked = false) => {
+    const selected = choice === id;
     return (
       <button
         type="button"
         role="radio"
         aria-checked={selected}
         disabled={locked}
-        onClick={() => setMode(id)}
+        onClick={() => setChoice(id)}
         className={cn(
           'w-full text-left rounded-3xl border-2 p-4 transition-colors',
           selected ? 'border-(--theme-accent) bg-(--theme-accent-light)' : 'border-(--theme-border) bg-(--theme-card-bg)',
@@ -70,7 +56,7 @@ export default function VoiceModeSheet({ open, status, onClose, onStart, onOpenP
               <span className="font-bold text-[15px] text-(--theme-ink)">{title}</span>
               <span className={cn(
                 'px-2 py-0.5 rounded-full text-[11px] font-bold',
-                id === 'free' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-amber-500/15 text-amber-700'
+                id === 'dictate' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-amber-500/15 text-amber-700'
               )}>{badge}</span>
             </div>
             <p className="text-[13px] text-(--theme-muted) mt-0.5">{description}</p>
@@ -104,56 +90,33 @@ export default function VoiceModeSheet({ open, status, onClose, onStart, onOpenP
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Sesli özellikler"
+            aria-label="Sesle konuş"
             className="w-full app-page-bg rounded-t-[2rem] border-t border-(--theme-border) px-5 pt-3 pb-8 max-h-[90%] overflow-y-auto"
           >
             <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-(--theme-border)" aria-hidden />
-            {onDictate && (
-              <div role="tablist" aria-label="Sesli özellik" className="flex gap-1 p-1 mb-4 rounded-full bg-(--theme-subtle-bg) border border-(--theme-border)">
-                {tab('translate', <AudioLines className="w-4 h-4" />, 'Sesli çevir')}
-                {tab('dictate', <Mic className="w-4 h-4" />, 'Sesli yaz')}
-              </div>
-            )}
-
-            {kind === 'dictate' && onDictate ? (
-              <>
-                <h2 className="font-display font-semibold text-xl text-(--theme-ink) mb-1">Sesli yazma</h2>
-                <p className="text-[13px] text-(--theme-muted) mb-4">Konuş, söylediklerin mesaj kutusuna yazılsın. Göndermeden önce düzeltebilirsin.</p>
-                <div className="rounded-3xl border-2 border-(--theme-accent) bg-(--theme-accent-light) p-4 flex items-center gap-3">
-                  <span className="w-11 h-11 shrink-0 rounded-2xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center"><Mic className="w-5 h-5" /></span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-[15px] text-(--theme-ink)">Mesajını sesle yaz</span>
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700">Ücretsiz</span>
-                    </div>
-                    <p className="text-[13px] text-(--theme-muted) mt-0.5">Bitirince “Durdur”a dokun, sonra gönder.</p>
-                  </div>
-                </div>
-                <button type="button" onClick={onDictate} className={cn(primaryButton, 'mt-5')}>
-                  <Mic className="w-5 h-5" /> Sesli yazmaya başla
-                </button>
-              </>
-            ) : (<>
-            <h2 className="font-display font-semibold text-xl text-(--theme-ink) mb-1">Sesli çeviri</h2>
-            <p className="text-[13px] text-(--theme-muted) mb-4">Telefon görüşmesi gibi konuş, karşı taraf kendi dilinde duysun.</p>
+            <h2 className="font-display font-semibold text-xl text-(--theme-ink) mb-1">Sesle konuş</h2>
+            <p className="text-[13px] text-(--theme-muted) mb-4">Ücretsizde konuştukların yazıya dönüşür. VIP'te karşı taraf seni kendi dilinde sesli duyar.</p>
             <AnnouncementBanner className="mb-4" />
 
             <div className="space-y-3" role="radiogroup" aria-label="Üyelik seçeneği">
               {option(
-                'free',
-                <span className="w-11 h-11 shrink-0 rounded-2xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center"><AudioLines className="w-5 h-5" /></span>,
-                'Ücretsiz üyelik', 'Ücretsiz',
-                'Tarayıcının kendi ses tanıması. 1–2 saniye gecikmeli, bazı telefonlarda kalite değişebilir.'
+                'dictate',
+                <span className="w-11 h-11 shrink-0 rounded-2xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center"><Mic className="w-5 h-5" /></span>,
+                'Ücretsiz · Sesli yazma', 'Ücretsiz',
+                onDictate
+                  ? 'Konuş, söylediklerin mesaj kutusuna yazılsın. Karşı tarafa yazılı mesaj olarak çevrilip gider, ses gitmez.'
+                  : 'Bu tarayıcı sesli yazmayı desteklemiyor.',
+                !onDictate
               )}
               {option(
                 'paid',
                 <span className="w-11 h-11 shrink-0 rounded-2xl bg-amber-500 text-white flex items-center justify-center"><Crown className="w-5 h-5" /></span>,
-                'VIP üyelik', 'VIP',
+                'VIP · Sesli çeviri', 'VIP',
                 vipOff ? 'VIP sesli çeviri şu an kapalı.'
-                : status?.access === 'everyone' ? 'Gemini canlı ses: akıcı, gerçek görüşme gibi. Şu an herkese ücretsiz!'
+                : status?.access === 'everyone' ? 'Mikrofona konuş, karşı taraf seni kendi dilinde sesli duysun. Şu an herkese ücretsiz!'
                 : status && !status.vipUntil && status.vipSeconds > 0
-                  ? `Gemini canlı ses. Kalan konuşma hakkın: ${formatTalkTime(status.vipSeconds)}`
-                  : 'Gemini canlı ses: akıcı, gerçek görüşme gibi.',
+                  ? `Karşı taraf seni kendi dilinde sesli duyar. Kalan konuşma hakkın: ${formatTalkTime(status.vipSeconds)}`
+                  : 'Mikrofona konuş, karşı taraf seni kendi dilinde sesli duysun. Gerçek görüşme gibi.',
                 !status || vipLocked
               )}
             </div>
@@ -168,11 +131,16 @@ export default function VoiceModeSheet({ open, status, onClose, onStart, onOpenP
               </button>
             )}
 
-            <button type="button" onClick={() => onStart(mode)} className={cn(primaryButton, 'mt-5')}>
-              {!status ? <Loader2 className="w-5 h-5 animate-spin" /> : <AudioLines className="w-5 h-5" />}
-              {mode === 'paid' ? 'VIP ile başlat' : 'Ücretsiz başlat'}
-            </button>
-            </>)}
+            {choice === 'dictate' ? (
+              <button type="button" onClick={onDictate} disabled={!onDictate} className={cn(primaryButton, 'mt-5')}>
+                <Mic className="w-5 h-5" /> Sesli yazmaya başla
+              </button>
+            ) : (
+              <button type="button" onClick={() => onStart('paid')} disabled={!status || vipLocked} className={cn(primaryButton, 'mt-5')}>
+                {!status ? <Loader2 className="w-5 h-5 animate-spin" /> : <AudioLines className="w-5 h-5" />}
+                VIP sesli çeviriyi başlat
+              </button>
+            )}
           </motion.div>
         </motion.div>
       )}

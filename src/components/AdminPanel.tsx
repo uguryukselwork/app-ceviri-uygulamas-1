@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ShieldCheck, Check, Loader2, Crown, Users, Megaphone, Gift, ShoppingBag, X, Trash2, Copy, Wand2, RefreshCw, Ticket, Search, Wallet, Clock, ChevronDown
+  ShieldCheck, Check, Loader2, Crown, Users, Megaphone, Gift, ShoppingBag, X, Trash2, RefreshCw, Search, Wallet, Clock, ChevronDown, KeyRound
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { fieldClass, primaryButton, IconTile, softIconButton } from './ui';
 import {
-  adminCheckPin, adminOverview, adminSetVipAccess, adminCreatePromo, adminDeletePromo, adminDecideRequest, adminAddBalance, adminGrantHours,
+  adminCheckPin, adminOverview, adminSetVipAccess, adminDecideRequest, adminAddBalance, adminGrantHours, adminRoomMembers, adminGrantVip,
   adminSetAnnouncement, fetchAnnouncement,
-  type AdminOverview, type AdminUser, type VipAccess, type VipRequest
+  type AdminOverview, type AdminUser, type VipAccess, type VipRequest, type RoomMember
 } from '../lib/api';
 import { describePlan, PACKAGES, PERIODS, formatTalkTime } from '../lib/plans';
 
@@ -24,7 +24,7 @@ const ACCESS_OPTIONS: { id: VipAccess; title: string; description: string; icon:
   {
     id: 'members',
     title: 'Ücretli',
-    description: 'VIP sesli çeviriyi yalnızca paketi ya da konuşma hakkı olanlar kullanır. Diğerleri ücretsiz modu kullanır.',
+    description: 'VIP sesli çeviriyi yalnızca paketi ya da konuşma hakkı olanlar kullanır. Diğerleri yalnızca sesli yazmayı (ücretsiz) kullanır.',
     icon: <Crown className="w-5 h-5" />,
     tone: 'bg-amber-500/15 text-amber-600',
   },
@@ -47,11 +47,6 @@ const USAGE_HOURS = [
 
 const formatUsd = (value: number) => `$${Number(value).toFixed(2)}`;
 
-const randomCode = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return 'VIP' + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-};
-
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -65,10 +60,9 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [giftDays, setGiftDays] = useState<Record<string, number>>({});
-  const [newCode, setNewCode] = useState(randomCode);
-  const [newDays, setNewDays] = useState(30);
-  const [newUses, setNewUses] = useState(10);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [roomCode, setRoomCode] = useState('');
+  const [roomDays, setRoomDays] = useState(30);
+  const [roomMembers, setRoomMembers] = useState<RoomMember[] | null>(null);
   const [userQuery, setUserQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState('');
@@ -85,12 +79,14 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
     setNotice(null);
     setSelectedUser(null);
     setUserQuery('');
+    setRoomCode('');
+    setRoomMembers(null);
   }, [open]);
 
   const explain = (err: unknown) => {
     const message = err instanceof Error ? err.message : '';
     if (message === 'too_many_attempts') return 'Çok fazla yanlış deneme. 15 dakika sonra tekrar dene.';
-    if (message.includes('code_exists')) return 'Bu kod zaten var. Başka bir kod dene.';
+    if (message.includes('room_not_found')) return 'Bu kodla bir oda bulunamadı.';
     if (message.includes('request_not_pending')) return 'Bu istek zaten yanıtlanmış.';
     if (message.includes('invalid_amount')) return 'Geçerli bir tutar gir (en fazla 10.000$).';
     if (message.includes('invalid_hours')) return 'Geçerli bir süre gir (1–8760 saat).';
@@ -167,12 +163,30 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
     run(`hours-${user.user_id}`, () => adminGrantHours(pin, user.user_id, hours),
       `${user.name} kullanıcısına ${hours} saat VIP konuşma hakkı gönderildi.`);
 
-  const copy = async (code: string) => {
+  const findRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (roomCode.length !== 6 || busy) return;
+    setBusy('room');
+    setError(null);
+    setNotice(null);
+    setRoomMembers(null);
     try {
-      await navigator.clipboard.writeText(code);
-      setCopied(code);
-      setTimeout(() => setCopied(null), 1500);
-    } catch { /* clipboard blocked */ }
+      const members = await adminRoomMembers(pin, roomCode);
+      if (!members) setError('Şifre artık geçerli değil. Paneli kapatıp yeniden aç.');
+      else setRoomMembers(members);
+    } catch (err) {
+      setError(explain(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const giveVip = async (member: RoomMember) => {
+    const label = GIFT_DURATIONS.find(d => d.days === roomDays)?.label ?? `${roomDays} gün`;
+    await run(`vip-${member.user_id}`, () => adminGrantVip(pin, member.user_id, roomDays), `${member.name} artık VIP (${label}).`);
+    // Show the new end date
+    const members = await adminRoomMembers(pin, roomCode).catch(() => null);
+    if (members) setRoomMembers(members);
   };
 
   const pending = overview?.requests.filter(r => r.status === 'pending') ?? [];
@@ -554,93 +568,70 @@ export default function AdminPanel({ open, onClose }: { open: boolean; onClose: 
                   </ul>
                 </section>
 
-                {/* Promo codes */}
+                {/* VIP by room code */}
                 <section className="space-y-2.5">
-                  <h3 className={sectionTitle}>Promosyon kodları</h3>
-                  <form
-                    className="rounded-3xl border-2 border-(--theme-border) bg-(--theme-card-bg) p-3.5 space-y-2.5"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void run('promo-create', () => adminCreatePromo(pin, newCode, newDays, newUses), `${newCode} kodu oluşturuldu.`)
-                        .then(() => setNewCode(randomCode()));
-                    }}
-                  >
-                    <div className="relative">
+                  <h3 className={sectionTitle}>Oda koduyla VIP ver</h3>
+                  <form onSubmit={findRoom} className="rounded-3xl border-2 border-(--theme-border) bg-(--theme-card-bg) p-3.5 space-y-2.5">
+                    <p className="text-[12.5px] text-(--theme-muted) px-1">Kullanıcının oda kodunu gir, odadaki kişilerden VIP yapmak istediğini seç.</p>
+                    <div className="flex gap-2">
                       <input
                         type="text"
-                        value={newCode}
-                        onChange={(e) => setNewCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))}
-                        aria-label="Yeni kod"
-                        className={cn(fieldClass, 'pr-12 font-display tracking-[0.12em]')}
+                        value={roomCode}
+                        onChange={(e) => { setRoomCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)); setRoomMembers(null); }}
+                        placeholder="ODA KODU"
+                        aria-label="Oda kodu"
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        className={cn(fieldClass, 'py-2.5 flex-1 min-w-0 font-display tracking-[0.2em]')}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setNewCode(randomCode())}
-                        aria-label="Rastgele kod üret"
-                        title="Rastgele kod üret"
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center text-(--theme-muted) hover:text-(--theme-accent) cursor-pointer"
-                      >
-                        <Wand2 className="w-4 h-4" />
+                      <button type="submit" disabled={roomCode.length !== 6 || !!busy} className="px-4 rounded-2xl bg-(--theme-accent) text-(--theme-on-accent) text-[13.5px] font-bold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer">
+                        {busy === 'room' ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                        Bul
                       </button>
                     </div>
-                    <div className="flex gap-2">
-                      <label className="flex-1 min-w-0">
-                        <span className="block text-[12px] font-bold text-(--theme-muted) mb-1 px-1">VIP süresi</span>
-                        <select value={newDays} onChange={(e) => setNewDays(Number(e.target.value))} className={cn(fieldClass, 'py-2.5')}>
-                          <option value={3}>3 gün</option>
-                          <option value={7}>1 hafta</option>
-                          <option value={30}>1 ay</option>
-                          <option value={90}>3 ay</option>
-                          <option value={365}>1 yıl</option>
-                        </select>
-                      </label>
-                      <label className="w-28 shrink-0">
-                        <span className="block text-[12px] font-bold text-(--theme-muted) mb-1 px-1">Kullanım hakkı</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={100000}
-                          value={newUses}
-                          onChange={(e) => setNewUses(Math.max(1, Math.min(100000, Number(e.target.value) || 1)))}
-                          className={cn(fieldClass, 'py-2.5')}
-                        />
-                      </label>
-                    </div>
-                    <button type="submit" disabled={newCode.length < 4 || !!busy} className={cn(primaryButton, 'py-3')}>
-                      {busy === 'promo-create' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
-                      Kod oluştur
-                    </button>
-                  </form>
-
-                  {overview.promos.length === 0 ? (
-                    <p className="text-[13px] text-(--theme-muted) px-1">Henüz kod yok.</p>
-                  ) : (
-                    <ul className="rounded-3xl border-2 border-(--theme-border) bg-(--theme-card-bg) divide-y divide-(--theme-border)">
-                      {overview.promos.map(p => (
-                        <li key={p.code} className="flex items-center gap-2 pl-4 pr-2 py-2.5">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-display font-semibold tracking-[0.1em] text-(--theme-ink)">{p.code}</div>
-                            <div className="text-[12px] text-(--theme-muted)">
-                              {p.days} gün VIP · {p.uses}/{p.max_uses} kullanıldı{p.uses >= p.max_uses ? ' · doldu' : ''}
-                            </div>
-                          </div>
-                          <button type="button" onClick={() => copy(p.code)} className={softIconButton} aria-label="Kodu kopyala" title="Kopyala">
-                            {copied === p.code ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!!busy}
-                            onClick={() => run(`promo-del-${p.code}`, () => adminDeletePromo(pin, p.code), `${p.code} silindi.`)}
-                            className={cn(softIconButton, 'hover:text-red-600 hover:bg-red-500/10')}
-                            aria-label="Kodu sil"
-                            title="Sil"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </li>
+                    <div className="flex gap-1 p-1 rounded-full bg-(--theme-subtle-bg)" role="radiogroup" aria-label="VIP süresi">
+                      {GIFT_DURATIONS.map(d => (
+                        <button
+                          key={d.days}
+                          type="button"
+                          role="radio"
+                          aria-checked={roomDays === d.days}
+                          onClick={() => setRoomDays(d.days)}
+                          className={cn('flex-1 py-1.5 rounded-full text-[12.5px] font-bold cursor-pointer', roomDays === d.days ? 'bg-(--theme-card-bg) text-(--theme-accent) shadow-sm' : 'text-(--theme-muted)')}
+                        >
+                          {d.label}
+                        </button>
                       ))}
-                    </ul>
-                  )}
+                    </div>
+                    {roomMembers && roomMembers.length === 0 && (
+                      <p className="text-[13px] text-(--theme-muted) px-1">Bu odada kimse yok.</p>
+                    )}
+                    {roomMembers && roomMembers.length > 0 && (
+                      <ul className="space-y-2">
+                        {roomMembers.map(m => (
+                          <li key={m.user_id} className="flex items-center gap-3 rounded-2xl bg-(--theme-subtle-bg) pl-3 pr-1.5 py-1.5">
+                            <span className="flex-1 min-w-0">
+                              <span className="block font-bold text-[14px] text-(--theme-ink) truncate">
+                                {m.name} <span className="font-normal text-[11.5px] text-(--theme-muted)">#{m.user_id.slice(0, 6)}</span>
+                              </span>
+                              <span className="block text-[12px] text-(--theme-muted)">
+                                {m.vip_until ? `VIP · ${formatDate(m.vip_until)} kadar` : 'Ücretsiz'}
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              disabled={!!busy}
+                              onClick={() => void giveVip(m)}
+                              className="px-3 py-2 rounded-xl bg-amber-500 text-white text-[13px] font-bold flex items-center gap-1.5 hover:bg-amber-600 disabled:opacity-50 cursor-pointer"
+                            >
+                              {busy === `vip-${m.user_id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
+                              {m.vip_until ? 'Uzat' : 'VIP yap'}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </form>
                 </section>
               </div>
             )}
