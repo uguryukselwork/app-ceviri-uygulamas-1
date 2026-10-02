@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Zap, Plus, X, Pencil, Trash2, Check, Reply, Mic, Square } from 'lucide-react';
+import { Send, Zap, Plus, X, Pencil, Trash2, Check, Reply } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
 import { t, getDefaultQuickMessages } from '../lib/i18n';
-import { Dictation, isDictationSupported } from '../lib/voice';
 
 /** Tell the partner "yazıyor…" at most this often while typing */
 const TYPING_PING_MS = 2500;
@@ -17,11 +16,9 @@ interface ChatInputProps {
   replyTo?: { name: string; text: string } | null;
   onCancelReply?: () => void;
   onTyping?: (typing: boolean) => void;
-  /** The microphone is taken by a voice call: no voice typing meanwhile */
-  micBusy?: boolean;
 }
 
-export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, onTyping, micBusy }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, onTyping }: ChatInputProps) {
   const { profile, quickMessages: savedQuickMessages, addQuickMessage, removeQuickMessage, updateQuickMessage } = useStore();
   const quickMessages = savedQuickMessages ?? getDefaultQuickMessages(profile.language);
   const lang = profile.language;
@@ -32,48 +29,6 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
   const [editText, setEditText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-
-  // Voice typing: what I say is written into the field; I can edit it before sending
-  const [dictating, setDictating] = useState(false);
-  const [dictationError, setDictationError] = useState<string | null>(null);
-  const dictationRef = useRef<Dictation | null>(null);
-  const dictationBase = useRef('');
-  const canDictate = isDictationSupported();
-
-  const stopDictation = () => {
-    dictationRef.current?.stop();
-    dictationRef.current = null;
-    setDictating(false);
-  };
-
-  const toggleDictation = () => {
-    if (dictating) return stopDictation();
-    setDictationError(null);
-    dictationBase.current = text.trim();
-    const dictation = new Dictation({
-      language: lang,
-      onText: (finalText, interim) => {
-        const spoken = [finalText, interim].filter(Boolean).join(' ');
-        handleTextChange([dictationBase.current, spoken].filter(Boolean).join(' '));
-      },
-      onEnd: (error) => {
-        dictationRef.current = null;
-        setDictating(false);
-        if (error) setDictationError(error);
-      },
-    });
-    dictationRef.current = dictation;
-    setDictating(true);
-    dictation.start();
-  };
-
-  useEffect(() => { if (micBusy) stopDictation(); }, [micBusy]);
-  useEffect(() => () => dictationRef.current?.stop(), []);
-  useEffect(() => {
-    if (!dictationError) return;
-    const timer = setTimeout(() => setDictationError(null), 4000);
-    return () => clearTimeout(timer);
-  }, [dictationError]);
 
   const startEditing = (msg: string) => {
     setEditingMsg(msg);
@@ -123,7 +78,6 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (text.trim() && !disabled) {
-      stopDictation();
       stopTyping();
       onSend(text.trim());
       setText('');
@@ -357,38 +311,12 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
           onChange={(e) => handleTextChange(e.target.value)}
           onBlur={stopTyping}
           onKeyDown={handleKeyDown}
-          placeholder={dictating ? 'Dinliyorum… konuş' : t('room.type_message', profile.language)}
+          placeholder={t('room.type_message', profile.language)}
           disabled={disabled}
           rows={1}
-          className={cn(
-            "w-full max-h-32 bg-transparent border-none outline-none focus:ring-0 resize-none py-3 text-[16px] sm:text-[15px] text-(--theme-ink) placeholder:text-(--theme-muted) disabled:opacity-50",
-            canDictate ? 'pr-1' : 'pr-4'
-          )}
+          className="w-full max-h-32 bg-transparent border-none outline-none focus:ring-0 resize-none py-3 pr-4 text-[16px] sm:text-[15px] text-(--theme-ink) placeholder:text-(--theme-muted) disabled:opacity-50"
         />
-        {canDictate && (
-          <div className="shrink-0 p-1.5 pr-2">
-            <button
-              type="button"
-              onClick={toggleDictation}
-              disabled={disabled || micBusy}
-              aria-pressed={dictating}
-              aria-label={dictating ? 'Sesli yazmayı durdur' : 'Sesli yaz'}
-              title={micBusy ? 'Sesli görüşme sırasında kullanılamaz' : dictating ? 'Durdur' : 'Sesli yaz'}
-              className={cn(
-                'w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
-                dictating
-                  ? 'bg-red-500 text-white animate-pulse'
-                  : 'text-(--theme-muted) hover:text-(--theme-accent) hover:bg-(--theme-accent-light)'
-              )}
-            >
-              {dictating ? <Square className="w-4 h-4 fill-current" /> : <Mic className="w-5 h-5" />}
-            </button>
-          </div>
-        )}
         </div>
-        {dictationError && (
-          <p role="alert" className="px-4 pb-2 text-[12.5px] font-bold text-red-600">{dictationError}</p>
-        )}
       </div>
       
       <button
