@@ -9,6 +9,8 @@ import { Dictation } from '../lib/voice';
 const TYPING_PING_MS = 2500;
 /** Stop showing "yazıyor…" after this much inactivity */
 const TYPING_IDLE_MS = 3500;
+/** Voice typing: once I'm quiet this long, what I said is sent */
+const DICTATION_SEND_MS = 1800;
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -39,18 +41,46 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Voice typing: what I say is written into the field; I can edit it before sending
+  // Voice typing: what I say is written into the field and sent by itself when I go quiet
   const [dictating, setDictating] = useState(false);
   const [dictationError, setDictationError] = useState<string | null>(null);
   const dictationRef = useRef<Dictation | null>(null);
   const dictationBase = useRef('');
+  const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textRef = useRef('');
   textRef.current = text;
+  // The send timer outlives renders: always use the latest props
+  const sendRef = useRef({ onSend, disabled });
+  sendRef.current = { onSend, disabled };
+
+  const clearSilenceTimer = () => {
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    silenceTimer.current = null;
+  };
 
   const stopDictation = () => {
+    clearSilenceTimer();
     dictationRef.current?.stop();
     dictationRef.current = null;
     setDictating(false);
+  };
+
+  /** Empties the field after a send; voice typing keeps listening for the next sentence */
+  const clearAfterSend = () => {
+    clearSilenceTimer();
+    dictationBase.current = '';
+    dictationRef.current?.reset();
+    stopTyping();
+    setText('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+  };
+
+  const sendDictated = () => {
+    silenceTimer.current = null;
+    const message = textRef.current.trim();
+    if (!message || sendRef.current.disabled || !dictationRef.current) return;
+    sendRef.current.onSend(message);
+    clearAfterSend();
   };
 
   const startDictation = () => {
@@ -61,9 +91,15 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
       language: lang,
       onText: (finalText, interim) => {
         const spoken = [finalText, interim].filter(Boolean).join(' ');
-        handleTextChange([dictationBase.current, spoken].filter(Boolean).join(' '));
+        const value = [dictationBase.current, spoken].filter(Boolean).join(' ');
+        textRef.current = value;
+        handleTextChange(value);
+        // Still talking: wait for the next pause
+        clearSilenceTimer();
+        if (spoken) silenceTimer.current = setTimeout(sendDictated, DICTATION_SEND_MS);
       },
       onEnd: (error) => {
+        clearSilenceTimer();
         dictationRef.current = null;
         setDictating(false);
         if (error) setDictationError(error);
@@ -77,7 +113,7 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
   useImperativeHandle(ref, () => ({ startDictation }));
 
   useEffect(() => { if (micBusy) stopDictation(); }, [micBusy]);
-  useEffect(() => () => dictationRef.current?.stop(), []);
+  useEffect(() => () => { clearSilenceTimer(); dictationRef.current?.stop(); }, []);
   useEffect(() => {
     if (!dictationError) return;
     const timer = setTimeout(() => setDictationError(null), 4000);
@@ -132,14 +168,8 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (text.trim() && !disabled) {
-      stopDictation();
-      stopTyping();
       onSend(text.trim());
-      setText('');
-      // Reset height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      clearAfterSend();
     }
   };
 
@@ -181,7 +211,7 @@ export default function ChatInput({ onSend, disabled, replyTo, onCancelReply, on
         {dictating && (
           <div className="flex items-center gap-2 mx-2 mt-2 pl-3 pr-1 py-1 rounded-2xl bg-red-500/10 text-red-600">
             <Mic className="w-4 h-4 shrink-0 animate-pulse" aria-hidden />
-            <span className="flex-1 min-w-0 text-[13px] font-bold truncate">Dinliyorum… konuş, yazıya dökülsün</span>
+            <span className="flex-1 min-w-0 text-[13px] font-bold truncate">Dinliyorum… susunca mesajın gider</span>
             <button
               type="button"
               onClick={stopDictation}

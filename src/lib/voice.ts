@@ -533,6 +533,9 @@ export class Dictation {
   private rec: Recognition | null = null;
   private finalText = '';
   private active = false;
+  /** Result indexes already used, and how many results the recognizer has given so far */
+  private handled = new Set<number>();
+  private seen = 0;
 
   constructor(private opts: {
     language: string;
@@ -549,9 +552,10 @@ export class Dictation {
     rec.continuous = true;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
-    const handled = new Set<number>();
-    rec.onstart = () => handled.clear();
+    const handled = this.handled;
+    rec.onstart = () => { handled.clear(); this.seen = 0; };
     rec.onresult = (e) => {
+      this.seen = e.results.length;
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (handled.has(i)) continue;
@@ -592,6 +596,12 @@ export class Dictation {
 
   stop() {
     this.finish();
+  }
+
+  /** The text so far was sent: start over, and ignore late finals of what was already said */
+  reset() {
+    this.finalText = '';
+    for (let i = 0; i < this.seen; i++) this.handled.add(i);
   }
 }
 

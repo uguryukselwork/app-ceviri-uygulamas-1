@@ -104,7 +104,7 @@ export default function VoiceModeSheet({ open, status, onClose, onStart, onOpenP
                 <span className="w-11 h-11 shrink-0 rounded-2xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center"><Mic className="w-5 h-5" /></span>,
                 'Ücretsiz · Sesli yazma', 'Ücretsiz',
                 onDictate
-                  ? 'Konuş, söylediklerin mesaj kutusuna yazılsın. Karşı tarafa yazılı mesaj olarak çevrilip gider, ses gitmez.'
+                  ? 'Konuş, susunca söylediklerin yazılı mesaj olarak kendiliğinden gönderilir ve çevrilir. Karşı tarafa ses gitmez.'
                   : 'Bu tarayıcı sesli yazmayı desteklemiyor.',
                 !onDictate
               )}
