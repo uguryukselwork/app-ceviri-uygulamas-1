@@ -151,6 +151,8 @@ export default function Home() {
   const recentRooms = [...savedRooms].sort((a, b) => b.lastAccessed - a.lastAccessed).slice(0, 8);
 
   return (
+    // Sheets sit outside the scrolling area so they always cover the screen, even when the page is scrolled or the keyboard is open
+    <div className="flex-1 min-h-0 flex flex-col relative">
     <div className="flex-1 flex flex-col items-center app-page-bg relative overflow-y-auto overflow-x-hidden">
       {/* Decorative background blobs matched to theme */}
       <div
@@ -361,6 +363,7 @@ export default function Home() {
             </div>
           </div>
         )}
+      </div>
       </div>
 
       <AccountSheet

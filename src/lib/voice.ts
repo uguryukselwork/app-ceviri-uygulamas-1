@@ -106,11 +106,16 @@ const words = (text: string) =>
  */
 export function isEcho(said: string, recentlyHeard: string) {
   const saidWords = words(said);
-  if (!saidWords.length) return false;
-  const heard = new Set(words(recentlyHeard));
-  if (!heard.size) return false;
-  const matched = saidWords.filter(w => heard.has(w)).length;
-  return matched / saidWords.length >= 0.6;
+  const heardWords = words(recentlyHeard);
+  if (!saidWords.length || !heardWords.length) return false;
+  if (saidWords.length === 1) return heardWords.includes(saidWords[0]);
+  // Word pairs in order, not single words: an English reply shares many words ("I", "you", "are", "the")
+  // with what was just heard, but an echo repeats them in the same order
+  const pairs = (w: string[]) => w.slice(1).map((x, i) => `${w[i]} ${x}`);
+  const heard = new Set(pairs(heardWords));
+  const saidPairs = pairs(saidWords);
+  const matched = saidPairs.filter(p => heard.has(p)).length;
+  return matched / saidPairs.length >= 0.6;
 }
 
 /** "nasılsın nasılsın nasılsın" -> "nasılsın": drops a word run (1-6 words) repeated right after itself */
