@@ -71,6 +71,24 @@ class LtCapture extends AudioWorkletProcessor {
 registerProcessor('lt-capture', LtCapture);`;
 const workletLoaded = new WeakSet<AudioContext>();
 
+// After a deploy, a tab still running the old build asks for a chunk that no longer exists.
+// Reload once so it picks up the new build instead of failing the call.
+const RELOAD_KEY = 'lt-chunk-reload';
+async function loadGenAI() {
+  try {
+    const mod = await import('@google/genai');
+    sessionStorage.removeItem(RELOAD_KEY);
+    return mod;
+  } catch (err) {
+    if (!sessionStorage.getItem(RELOAD_KEY)) {
+      sessionStorage.setItem(RELOAD_KEY, '1');
+      location.reload();
+      await new Promise(() => {});
+    }
+    throw new Error('Uygulama güncellendi, lütfen sayfayı yenileyin');
+  }
+}
+
 /** Downsamples mic audio to 16 kHz PCM16 and hands out ~100 ms chunks */
 class Downsampler {
   private pos = 0;
@@ -254,7 +272,7 @@ export class VoiceTranslator implements VoiceEngine {
     }
     if (!this.active) return;
 
-    const { GoogleGenAI } = await import('@google/genai');
+    const { GoogleGenAI } = await loadGenAI();
     const ai = new GoogleGenAI({ apiKey: data.token, httpOptions: { apiVersion: 'v1alpha' } });
     this.session = await ai.live.connect({
       model: data.model,
