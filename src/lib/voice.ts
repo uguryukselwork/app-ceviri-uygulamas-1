@@ -538,9 +538,11 @@ export class Dictation {
   private rec: Recognition | null = null;
   private finalText = '';
   private active = false;
-  /** Result indexes already used, and how many results the recognizer has given so far */
+  /** Result indexes already used (Android repeats old results) */
   private handled = new Set<number>();
-  private seen = 0;
+  /** What was already sent; iPhones keep repeating the whole session's text, so it is cut off the front */
+  private sent = '';
+  private last = '';
 
   constructor(private opts: {
     language: string;
@@ -558,9 +560,9 @@ export class Dictation {
     rec.interimResults = true;
     rec.maxAlternatives = 1;
     const handled = this.handled;
-    rec.onstart = () => { handled.clear(); this.seen = 0; };
+    // A new recognition session starts empty: nothing old to cut off
+    rec.onstart = () => { handled.clear(); this.sent = ''; this.last = ''; };
     rec.onresult = (e) => {
-      this.seen = e.results.length;
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (handled.has(i)) continue;
@@ -576,7 +578,19 @@ export class Dictation {
           interim += (interim ? ' ' : '') + text;
         }
       }
-      this.opts.onText(this.finalText, interim);
+      let spoken = [this.finalText, interim].filter(Boolean).join(' ');
+      const done = words(this.sent);
+      if (done.length) {
+        const parts = spoken.split(/\s+/).filter(Boolean);
+        // Skip whole tokens until the sent words are used up; only when the text really starts with them
+        let i = 0, used: string[] = [];
+        while (i < parts.length && used.length < done.length) used = used.concat(words(parts[i++]));
+        if (used.length === done.length && used.every((w, k) => w === done[k])) spoken = parts.slice(i).join(' ');
+      }
+      // iPhones re-send the same result while it is quiet: only real changes count as speech
+      if (spoken === this.last) return;
+      this.last = spoken;
+      this.opts.onText(spoken, '');
     };
     rec.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') this.finish('Mikrofon izni verilmedi');
@@ -603,10 +617,12 @@ export class Dictation {
     this.finish();
   }
 
-  /** The text so far was sent: start over, and ignore late finals of what was already said */
+  /** The text so far was sent: start over; what was sent is cut off anything the recognizer repeats */
   reset() {
+    // Android gives new results after a send; iPhones repeat the old text in front of the new
+    this.sent = [this.sent, this.last].filter(Boolean).join(' ');
+    this.last = '';
     this.finalText = '';
-    for (let i = 0; i < this.seen; i++) this.handled.add(i);
   }
 }
 
